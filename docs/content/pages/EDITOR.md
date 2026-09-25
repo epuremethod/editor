@@ -204,6 +204,13 @@ Markdown cannot say them, so the serializer splits at every boundary, emits
 each segment with its full set of marks, and merges adjacent segments whose
 sets are equal.
 
+Bold and italic never open or close on a space, in the model as in the file,
+because CommonMark refuses `**bold **`. Two runs of one of them parted by
+spaces alone are one run. So typing a space at the end of a bold run leaves
+the space plain and keeps bold pending, and the next letter rejoins the run
+across it. A code span and a link keep their edges, since a space inside them
+is content.
+
 ## Across blocks
 
 One `selectionchange` listener on the document is enough. Each block root

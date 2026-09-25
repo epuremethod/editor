@@ -1,0 +1,112 @@
+feature: Caret
+background:
+  given: an editor
+examples:
+  - scenario: right moves the caret one character
+    before: |
+      Every |open set is a union of basis members.
+    when: ->
+    after: |
+      Every o|pen set is a union of basis members.
+
+  - scenario: left moves the caret one character back
+    before: |
+      Every o|pen set is a union of basis members.
+    when: <-
+    after: |
+      Every |open set is a union of basis members.
+
+  - scenario: right at the end of a block moves to the start of the next one
+    before: |
+      @a A set is closed when its complement is open.|
+      @b Both the empty set and X are closed.
+    when: ->
+    after: |
+      @a A set is closed when its complement is open.
+      @b |Both the empty set and X are closed.
+
+  - scenario: left at the start of a block moves to the end of the previous one
+    before: |
+      @a A set is closed when its complement is open.
+      @b |Both the empty set and X are closed.
+    when: <-
+    after: |
+      @a A set is closed when its complement is open.|
+      @b Both the empty set and X are closed.
+
+  - scenario: right at the end of the last block changes nothing
+    before: |
+      The closure of A is the smallest closed set containing A.|
+    when: ->
+    after: |
+      The closure of A is the smallest closed set containing A.|
+
+  - scenario: right at the end of a run steps out of it before it moves
+    before: |
+      An **open|** cover of X is a family of open sets.
+    when: ->
+    after: |
+      An **open**| cover of X is a family of open sets.
+
+  - scenario: the next right moves in the text
+    before: |
+      An **open**| cover of X is a family of open sets.
+    when: ->
+    after: |
+      An **open** |cover of X is a family of open sets.
+
+  - scenario: left from outside a run steps into it
+    before: |
+      An **open**| cover of X is a family of open sets.
+    when: <-
+    after: |
+      An **open|** cover of X is a family of open sets.
+
+  - scenario: right before a run steps into it
+    before: |
+      Every |**open** set is a union of basis members.
+    when: ->
+    after: |
+      Every **|open** set is a union of basis members.
+
+  - scenario: left at the start of a run steps out of it
+    before: |
+      Every **|open** set is a union of basis members.
+    when: <-
+    after: |
+      Every |**open** set is a union of basis members.
+
+  - scenario: one step crosses every mark that ends at the caret
+    before: |
+      A space is **_compact|_** when every open cover has a finite subcover.
+    when: ->
+    after: |
+      A space is **_compact_**| when every open cover has a finite subcover.
+
+  - scenario: left into a link lets typing extend it
+    before: |
+      See [compactness](/compactness)| for the finite subcover property.
+    when: [<-, "input(See compactness,| for the finite subcover property.)"]
+    after: |
+      See [compactness,|](/compactness) for the finite subcover property.
+
+  - scenario: typing after stepping out of a run is not marked
+    before: |
+      An **open**| cover of X is a family of open sets.
+    when: input(An opens| cover of X is a family of open sets.)
+    after: |
+      An **open**s| cover of X is a family of open sets.
+
+  - scenario: backspace from outside a run deletes its last letter and lands inside
+    before: |
+      An **open**| cover of X is a family of open sets.
+    when: backspace
+    after: |
+      An **ope|** cover of X is a family of open sets.
+
+  - scenario: backspace inside a block deletes the character before the caret
+    before: |
+      Every open ball is an| open set.
+    when: backspace
+    after: |
+      Every open ball is a| open set.

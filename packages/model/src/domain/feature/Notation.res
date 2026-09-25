@@ -1,8 +1,8 @@
 // The notation a scenario writes a document in, and the one it is read back
-// out as. One line is one block. The text of the line is the block's text,
-// `|` is the caret and `{` `}` hold a selection. A line may start with `@a `
-// to name the block's id; a line that names none gets a letter by position.
-// A backslash keeps the character after it literal.
+// out as. One line is one block. The text of the line is the block's text
+// in inline markdown, `|` is the caret and `{` `}` hold a selection. A line
+// may start with `@a ` to name the block's id; a line that names none gets
+// a letter by position. A backslash keeps the character after it literal.
 
 type read = {doc: Doc.t, labeled: bool}
 
@@ -10,21 +10,16 @@ let letters = "abcdefghijklmnopqrstuvwxyz"
 
 // The id a block gets from its position: `a` to `z`, then `aa`, `ab` and on.
 let rec letter = index =>
-  (index >= 26 ? letter(index / 26 - 1) : "") ++
-  letters->String.charAt(mod(index, 26))
+  (index >= 26 ? letter(index / 26 - 1) : "") ++ letters->String.charAt(mod(index, 26))
 
 let labelLine = /^@([a-z][a-z0-9]*)(?: |$)/
 
-type marker = Caret | Open | Close
-
-type mutable_ = {
-  mutable text: string,
-  mutable markers: array<(marker, int)>,
-}
-
 let raise = (line, message) => panic(`Notation, line ${Int.toString(line)}: ${message}`)
 
-let readLine = (raw, ~line) => {
+// The delimiters of inline markdown, kept literal when a line is plain.
+let quote = (text: string) => text->String.replaceRegExp(/[*_`\[\]]/g, "\\$&")
+
+let readLine = (raw, ~plain) => {
   let (label, rest) = switch labelLine->RegExp.exec(raw) {
   | Some(found) =>
     let name = found->RegExp.Result.matches->Array.getUnsafe(0)->Option.getOr("")
@@ -32,74 +27,58 @@ let readLine = (raw, ~line) => {
     (Some(name), raw->String.slice(~start=whole->String.length))
   | None => (None, raw)
   }
-  let out = {text: "", markers: []}
-  let escaped = ref(false)
-  rest
-  ->String.split("")
-  ->Array.forEach(character => {
-    if escaped.contents {
-      out.text = out.text ++ character
-      escaped := false
-    } else {
-      switch character {
-      | "\\" => escaped := true
-      | "|" => out.markers->Array.push((Caret, out.text->String.length))
-      | "{" => out.markers->Array.push((Open, out.text->String.length))
-      | "}" => out.markers->Array.push((Close, out.text->String.length))
-      | other => out.text = out.text ++ other
-      }
-    }
-  })
-  if escaped.contents {
-    raise(line, "a backslash at the end of the line keeps nothing")
-  }
-  (label, out.text, out.markers)
+  let {text, markers} = Inline.read(plain ? quote(rest) : rest)
+  (label, text, markers)
 }
 
-let read = (source: string): read => {
+// Reads a document. A plain source holds no marks: its delimiters are text,
+// the way the browser hands a block back.
+let read = (source: string, ~plain=false): read => {
   let lines = source->String.endsWith("\n") ? source->String.slice(~start=0, ~end=-1) : source
   let anchor = ref(None)
   let focus = ref(None)
+  let pending = ref([])
   let labeled = ref(false)
-  let point = (id, offset, ~line, ~what) =>
-    switch (anchor.contents, focus.contents) {
-    | (None, None) => (Some({Doc.block: id, offset}), Some({Doc.block: id, offset}))
-    | _ => raise(line, `a second ${what} when the document already holds a selection`)
-    }
-  let blocks = lines->String.split("\n")->Array.mapWithIndex((raw, index) => {
-    let line = index + 1
-    let (label, text, markers) = readLine(raw, ~line)
-    let id = switch label {
-    | Some(name) =>
-      labeled := true
-      name
-    | None => letter(index)
-    }
-    markers->Array.forEach(((marker, offset)) =>
-      switch marker {
-      | Caret =>
-        let (from, to) = point(id, offset, ~line, ~what="caret")
-        anchor := from
-        focus := to
-      | Open =>
-        if anchor.contents != None {
-          raise(line, "a second { when the document already holds a selection")
-        }
-        anchor := Some({Doc.block: id, offset})
-      | Close =>
-        if anchor.contents == None {
-          raise(line, "a } before any {")
-        }
-        if focus.contents != None {
-          raise(line, "a second }")
-        }
-        focus := Some({Doc.block: id, offset})
+  let blocks =
+    lines
+    ->String.split("\n")
+    ->Array.mapWithIndex((raw, index) => {
+      let line = index + 1
+      let (label, content, markers) = readLine(raw, ~plain)
+      let id = switch label {
+      | Some(name) =>
+        labeled := true
+        name
+      | None => letter(index)
       }
-    )
-    {Doc.id, content: {text, marks: []}}
-  })
+      markers->Array.forEach(({marker, offset, kinds}) =>
+        switch marker {
+        | Caret =>
+          if anchor.contents != None {
+            raise(line, "a caret when the document already holds a selection")
+          }
+          anchor := Some({Doc.block: id, offset})
+          focus := Some({Doc.block: id, offset})
+          pending := kinds
+        | Open =>
+          if anchor.contents != None {
+            raise(line, "a second { when the document already holds a selection")
+          }
+          anchor := Some({Doc.block: id, offset})
+        | Close =>
+          if anchor.contents == None {
+            raise(line, "a } before any {")
+          }
+          if focus.contents != None {
+            raise(line, "a second }")
+          }
+          focus := Some({Doc.block: id, offset})
+        }
+      )
+      {Doc.id, content}
+    })
   let selection = switch (anchor.contents, focus.contents) {
-  | (Some(anchor), Some(focus)) => Some({Doc.anchor, focus})
+  | (Some(anchor), Some(focus)) => Some({Doc.anchor, focus, pending: pending.contents})
   | (Some(_), None) => raise(lines->String.split("\n")->Array.length, "a { without its }")
   | _ => None
   }
@@ -113,37 +92,34 @@ let read = (source: string): read => {
   {doc: {blocks, selection}, labeled: labeled.contents}
 }
 
-let escape = text =>
-  text->String.replaceRegExp(/[\\|{}]/g, "\\$&")
-
-// The block's text with the selection marks put back at their offsets. A
-// selection over several blocks opens in one and closes in another.
-let writeText = (block: Doc.block, selection: option<Doc.selection>) => {
-  let text = block.content.text
-  let at = offset => escape(text->String.slice(~start=0, ~end=offset))
-  let from = offset => escape(text->String.slice(~start=offset))
-  switch selection {
-  | None => escape(text)
-  | Some({anchor, focus}) if anchor == focus =>
-    anchor.block == block.id ? at(anchor.offset) ++ "|" ++ from(anchor.offset) : escape(text)
+// The markers a block writes: its caret, or the end of the selection it
+// holds. A selection over several blocks opens in one and closes in another.
+let points = (doc: Doc.t, block: Doc.block): array<Inline.point> =>
+  switch doc.selection {
+  | None => []
+  | Some({anchor, focus, pending}) if anchor == focus =>
+    anchor.block == block.id ? [{marker: Caret, offset: anchor.offset, kinds: pending}] : []
   | Some({anchor, focus}) =>
-    let opens = anchor.block == block.id
-    let closes = focus.block == block.id
-    switch (opens, closes) {
-    | (true, true) =>
-      let (start, stop) = (Math.Int.min(anchor.offset, focus.offset), Math.Int.max(anchor.offset, focus.offset))
-      at(start) ++ "{" ++ escape(text->String.slice(~start, ~end=stop)) ++ "}" ++ from(stop)
-    | (true, false) => at(anchor.offset) ++ "{" ++ from(anchor.offset)
-    | (false, true) => at(focus.offset) ++ "}" ++ from(focus.offset)
-    | (false, false) => escape(text)
+    let index = id => Doc.find(doc, id)->Option.getOr(-1)
+    let (start, stop) =
+      index(anchor.block) < index(focus.block) ||
+        (anchor.block == focus.block && anchor.offset <= focus.offset)
+        ? (anchor, focus)
+        : (focus, anchor)
+    let out = []
+    if start.block == block.id {
+      out->Array.push({Inline.marker: Open, offset: start.offset, kinds: []})
     }
+    if stop.block == block.id {
+      out->Array.push({Inline.marker: Close, offset: stop.offset, kinds: []})
+    }
+    out
   }
-}
 
 let write = (doc: Doc.t, ~labels=false): string =>
   doc.blocks
   ->Array.map(block => {
-    let text = writeText(block, doc.selection)
+    let text = Inline.write(block.content, ~points=points(doc, block))
     let text = text->String.startsWith("@") ? "\\" ++ text : text
     labels ? `@${block.id} ${text}` : text
   })

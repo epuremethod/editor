@@ -470,6 +470,23 @@ body {
   background: var(--red);
 }
 
+.tree__pending {
+  display: inline-block;
+  margin: 0 0.1em 0 0.15em;
+  padding: 0 0.25em;
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  font-weight: 600;
+  line-height: 1.1rem;
+  vertical-align: 0.45em;
+  color: var(--red);
+  border: 1px solid var(--red);
+}
+
+.tree__text a { color: var(--black); text-decoration: underline; text-decoration-color: var(--red); text-decoration-thickness: 2px; text-underline-offset: 0.15em; }
+
+.tree__text code { font-family: var(--mono); font-size: 0.85em; background: var(--grey-faint); padding: 0.05em 0.3em; }
+
 .tree__range {
   background: #fbdcd9;
   color: inherit;

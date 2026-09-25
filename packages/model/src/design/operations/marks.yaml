@@ -1,0 +1,103 @@
+feature: Marks
+background:
+  given: an editor
+examples:
+  - scenario: typing at the end of a bold run extends the run
+    before: |
+      The **interior|** is the largest open set inside A.
+    when: input(The interior of A| is the largest open set inside A.)
+    after: |
+      The **interior of A|** is the largest open set inside A.
+
+  - scenario: typing at the end of a link does not extend the link
+    before: |
+      The proof uses the [Heine–Borel theorem](/heine-borel)| once.
+    when: input(The proof uses the Heine–Borel theorem twice,| once.)
+    after: |
+      The proof uses the [Heine–Borel theorem](/heine-borel) twice,| once.
+
+  - scenario: typing at the start of a run does not extend it
+    before: |
+      |**Compactness** is preserved by continuous maps.
+    when: "input(Note: |Compactness is preserved by continuous maps.)"
+    after: |
+      Note: |**Compactness** is preserved by continuous maps.
+
+  - scenario: deleting inside a run keeps the run
+    before: |
+      The **interior|** of A is the largest open set inside A.
+    when: input(The interio| of A is the largest open set inside A.)
+    after: |
+      The **interio|** of A is the largest open set inside A.
+
+  - scenario: text typed over a selection takes the marks of the selection's first character
+    before: |
+      Every {**open** set} is a union of basis members.
+    when: input(Every member| is a union of basis members.)
+    after: |
+      Every **member|** is a union of basis members.
+
+  - scenario: bold over a selection marks it and keeps the selection
+    before: |
+      A {compact} space has a finite subcover for every open cover.
+    when: bold
+    after: |
+      A {**compact**} space has a finite subcover for every open cover.
+
+  - scenario: bold over a bold selection removes the mark
+    before: |
+      A {**compact**} space has a finite subcover for every open cover.
+    when: bold
+    after: |
+      A {compact} space has a finite subcover for every open cover.
+
+  - scenario: bold over a partly bold selection makes all of it bold
+    before: |
+      A {**com**pact} space has a finite subcover for every open cover.
+    when: bold
+    after: |
+      A {**compact**} space has a finite subcover for every open cover.
+
+  - scenario: italic over bold gives both, written in one order
+    before: |
+      A {**compact**} space has a finite subcover for every open cover.
+    when: italic
+    after: |
+      A {**_compact_**} space has a finite subcover for every open cover.
+
+  - scenario: bold on a caret holds until the next typed character
+    before: |
+      A |space is compact when every open cover has a finite subcover.
+    when: [bold, input(A c|space is compact when every open cover has a finite subcover.)]
+    after: |
+      A **c|**space is compact when every open cover has a finite subcover.
+
+  - scenario: a link over a selection wraps it
+    before: |
+      Every {compact} subset of a Hausdorff space is closed.
+    when: link(/compactness)
+    after: |
+      Every {[compact](/compactness)} subset of a Hausdorff space is closed.
+
+  - scenario: bold over a range that holds a code span skips the span
+    before: |
+      The set {`U` is open} in X.
+    when: bold
+    after: |
+      The set {`U` **is open**} in X.
+
+  - scenario: enter inside a bold run carries the mark into both halves
+    before: |
+      **Open sets are| closed under unions.**
+    when: enter
+    after: |
+      **Open sets are**
+      |**closed under unions.**
+
+  - scenario: backspace joins two blocks and merges equal runs at the seam
+    before: |
+      **Closed sets**
+      |**are the complements of open sets.**
+    when: backspace
+    after: |
+      **Closed sets |are the complements of open sets.**

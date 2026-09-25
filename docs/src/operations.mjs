@@ -15,8 +15,8 @@ function escape(value) {
     .replaceAll('"', "&quot;")
 }
 
-// The part of the selection that lands in one block: a caret offset, or the
-// range the block holds of it.
+// The part of the selection that lands in one block: a caret offset with
+// its pending marks, or the range the block holds of it.
 function within(doc, block) {
   const selection = doc.selection
   if (!selection) return {}
@@ -25,7 +25,7 @@ function within(doc, block) {
     (a, b) => index(a.block) - index(b.block) || a.offset - b.offset,
   )
   if (start.block === stop.block && start.offset === stop.offset) {
-    return start.block === block.id ? {caret: start.offset} : {}
+    return start.block === block.id ? {caret: start.offset, pending: selection.pending} : {}
   }
   const here = index(block.id)
   const from = index(start.block)
@@ -37,17 +37,56 @@ function within(doc, block) {
   }
 }
 
+// A mark's kind, as the model compiles it: a string, or a link with its href.
+const rank = {Link: 0, Bold: 1, Italic: 2, Code: 3}
+const name = kind => (typeof kind === "string" ? kind : "Link")
+const initial = {Bold: "B", Italic: "I", Code: "`", Link: "K"}
+
+function wrap(mark, inner) {
+  switch (name(mark.kind)) {
+    case "Bold":
+      return `<strong>${inner}</strong>`
+    case "Italic":
+      return `<em>${inner}</em>`
+    case "Code":
+      return `<code>${inner}</code>`
+    default:
+      return `<a href="${escape(mark.kind._0)}">${inner}</a>`
+  }
+}
+
+const covering = (marks, at) => marks.filter(mark => mark.start <= at && at < mark.stop)
+const sameSet = (a, b) => a.length === b.length && a.every(kind => b.some(other => name(other) === name(kind)))
+
+// The caret, with the marks it holds when they are worth showing: at a mark
+// boundary, or when they differ from the character before it.
+function caretHtml(content, at, pending) {
+  const before = at > 0 ? covering(content.marks, at - 1).map(mark => mark.kind) : []
+  const boundary = content.marks.some(mark => mark.start === at || mark.stop === at)
+  const shown = boundary || !sameSet(pending, before)
+  const label = pending.length ? pending.map(kind => initial[name(kind)]).join("") : "–"
+  return `<span class="tree__caret"></span>${shown ? `<span class="tree__pending">${label}</span>` : ""}`
+}
+
 function text(doc, block) {
-  const value = block.content.text
-  const {caret, range} = within(doc, block)
-  if (caret !== undefined) {
-    return `${escape(value.slice(0, caret))}<span class="tree__caret"></span>${escape(value.slice(caret))}`
-  }
-  if (range) {
-    const [start, stop] = range
-    return `${escape(value.slice(0, start))}<mark class="tree__range">${escape(value.slice(start, stop))}</mark>${escape(value.slice(stop))}`
-  }
-  return escape(value)
+  const content = block.content
+  const {caret, pending, range} = within(doc, block)
+  const cuts = new Set([0, content.text.length])
+  content.marks.forEach(mark => cuts.add(mark.start).add(mark.stop))
+  if (caret !== undefined) cuts.add(caret)
+  if (range) cuts.add(range[0]).add(range[1])
+  const offsets = [...cuts].sort((a, b) => a - b)
+  let html = ""
+  offsets.forEach((at, index) => {
+    if (range && at === range[1]) html += "</mark>"
+    if (caret === at) html += caretHtml(content, at, pending)
+    if (range && at === range[0]) html += '<mark class="tree__range">'
+    const next = offsets[index + 1]
+    if (next === undefined) return
+    const marks = covering(content.marks, at).sort((a, b) => rank[name(b.kind)] - rank[name(a.kind)])
+    html += marks.reduce((inner, mark) => wrap(mark, inner), escape(content.text.slice(at, next)))
+  })
+  return html
 }
 
 function tree(doc) {
@@ -60,14 +99,14 @@ function tree(doc) {
   return `<ol class="tree">${blocks}</ol>`
 }
 
-// A caret or a selection written into one line of the notation, drawn the
-// way a block draws it.
+// The argument of `input`, plain text with its caret, drawn the way a block
+// draws it.
 function line(source) {
-  const {doc} = read(source)
+  const {doc} = read(source, true)
   return doc.blocks.map(block => text(doc, block)).join("")
 }
 
-const actLine = /^(\w+)(?:\((.*)\))?$/s
+const actLine = /^(\w+|->|<-)(?:\((.*)\))?$/s
 
 function parsed(when) {
   return (Array.isArray(when) ? when : [when]).map(said => {
@@ -78,7 +117,7 @@ function parsed(when) {
 }
 
 // One keycap per act: the key that runs it.
-const keys = {backspace: "⌫", enter: "↵", input: "a"}
+const keys = {backspace: "⌫", enter: "↵", input: "a", "->": "→", "<-": "←", bold: "B", italic: "I", code: "`", link: "K"}
 
 function sign(name) {
   return `<span class="op__key" aria-hidden="true">${keys[name] ?? "→"}</span>`

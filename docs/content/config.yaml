@@ -55,6 +55,8 @@ build:
       joinOps: {file: ../../packages/model/src/design/operations/join.yaml, transform: operations}
       splitOps: {file: ../../packages/model/src/design/operations/split.yaml, transform: operations}
       inputOps: {file: ../../packages/model/src/design/operations/input.yaml, transform: operations}
+      marksOps: {file: ../../packages/model/src/design/operations/marks.yaml, transform: operations}
+      caretOps: {file: ../../packages/model/src/design/operations/caret.yaml, transform: operations}
       pageBody: {file: pages/OPERATIONS.md, transform: docsMd}
       operationsToc: {file: pages/OPERATIONS.md, transform: docsToc}
       operationsCurrent: ' aria-current="page"'

@@ -23,10 +23,22 @@ Hello world
   identity. When the `after` of a scenario names none, ids are not compared.
 - A backslash keeps the character after it literal: `\|`, `\{`, `\}`, `\\`
   and `\@`.
-- An empty line is an empty block.
+- An empty line is an empty block. A line that starts with `# ` is a heading
+  block, and the hashes are not part of its text.
+- Marks are inline markdown in one canonical form: `**bold**`, `_italic_`,
+  `` `code` `` and `[text](href)`. A set of marks nests in one order, link
+  outside, then bold, then italic, then code. Bold and italic never open or
+  close on a space, and two runs of one of them parted by spaces alone are
+  one run. A literal marker takes a backslash.
+- The side of the caret at a marker says which marks are pending. `**open|**`
+  types the next letter bold and `**open**|` does not. Empty markers around
+  the caret, `**|**`, hold a pending mark in plain text.
 - The act is a word, with its argument in parentheses: `backspace`, `enter`,
+  `bold`, `italic`, `code`, `link(/open-sets)`,
   `input(For every ε| there is a δ.)`. Several acts make a list:
-  `[enter, enter]`.
+  `[enter, enter]`. The two arrows, `->` and `<-`, are acts too. The
+  argument of `input` is plain text: the browser knows no marks, so none are
+  read in it.
 
 The text of every scenario comes from one course on topology. The course
 needs what the editor finds hard: inline math, LaTeX blocks, letters composed
@@ -67,3 +79,25 @@ that changed, so marks move with it. Typing, composition, dead keys and
 autocorrect all land here.
 
 {{inputOps}}
+
+## Marks
+
+A mark extends when typing reaches its end, unless it is a link. No mark
+extends at its start. A toggle over a selection adds the mark to all of it or
+removes it from all of it, keeps the selection, and skips any code span. On a
+caret a toggle stores a pending mark for the next typed character.
+
+{{marksOps}}
+
+## Caret
+
+An arrow moves the caret one character. At the end of a block it crosses to
+the next one. At a mark boundary the first press changes side without moving
+in the text, and the second press moves: `**open|**` becomes `**open**|`, and
+typing there is not bold. One press crosses every mark that ends at the
+caret. After typing, the pending marks are the ones the typed text took.
+After a deletion they follow the character before the caret, so backspace
+from outside a run lands inside it. Up and down depend on line layout and
+belong to the view, not the model.
+
+{{caretOps}}

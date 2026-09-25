@@ -5,13 +5,14 @@ open EpureVitest
 // the `after` names one, so a scenario about identity says so by writing it.
 //
 // An act is a word, with its argument in parentheses: `backspace`, `enter`,
-// `input(For every ε| there is a δ.)`. Several acts make a list. The argument
-// of `input` is one block in the notation: the text the browser left in it
-// and the selection.
+// `bold`, `link(/open-sets)`, `input(For every ε| there is a δ.)`. The two
+// arrows, `->` and `<-`, are acts too. Several acts make a list. The argument of `input` is one block as the browser left
+// it: plain text and the selection, with no marks, since the browser knows
+// none.
 
 type example = {before: string, @as("when") when_: JSON.t, after: string}
 
-let actLine = /^(\w+)(?:\((.*)\))?$/s
+let actLine = /^(\w+|->|<-)(?:\((.*)\))?$/s
 
 // A new block takes the first letter no block holds, so an `after` written
 // without ids reads a split as `a` then `b`.
@@ -34,15 +35,22 @@ let act = (doc: Doc.t, said: string) => {
   switch (name, argument) {
   | ("backspace", None) => Edit.deleteBackward(doc)
   | ("enter", None) => Edit.split(doc, ~id=mint(doc))
+  | ("->", None) => Edit.right(doc)
+  | ("<-", None) => Edit.left(doc)
+  | ("bold", None) => Edit.toggle(doc, ~mark="bold")
+  | ("italic", None) => Edit.toggle(doc, ~mark="italic")
+  | ("code", None) => Edit.toggle(doc, ~mark="code")
+  | ("link", Some(href)) => Edit.link(doc, ~href)
   | ("input", Some(block)) =>
-    let {doc: changed} = Notation.read(block)
+    let {doc: changed} = Notation.read(block, ~plain=true)
     switch (changed.blocks, changed.selection) {
     | ([{content: {text}}], Some({anchor, focus})) =>
       Edit.input(doc, ~text, ~anchor=anchor.offset, ~focus=focus.offset)
     | ([_], None) => panic("The argument of input holds a caret or a selection")
     | _ => panic("The argument of input is one block")
     }
-  | ("input", None) => panic("input takes the block as the browser left it: input(For every ε| there is a δ.)")
+  | ("input", None) =>
+    panic("input takes the block as the browser left it: input(For every ε| there is a δ.)")
   | (other, _) => panic(`The act ${other} is not known`)
   }
 }
