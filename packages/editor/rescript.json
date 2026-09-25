@@ -1,5 +1,5 @@
 {
-  "name": "@editor/model",
+  "name": "@epure/editor",
   "namespace": "Editor",
   "sources": [
     {

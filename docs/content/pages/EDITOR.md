@@ -6,6 +6,16 @@ text blob. This page settles the words, what lives in the store, how two
 copies of a section merge, and how the browser is kept out of the model. The
 Operations page holds the contract, one card per edit.
 
+Three packages share the work, and the dependency runs one way.
+`@epure/editor` is the core: the types, the pure model, the notation,
+markdown in and out, and one small storage port of plain data. It depends on
+nothing, and it is the third instrument of the method beside `@epure/vitest`,
+which runs the scenarios, and `@epure/minidoc`, which publishes them: this
+one writes them. `@tilia/editor` renders: React over contentEditable, input
+events into acts, the block views keyed by id through tilia. `@lapa/editor`
+fills the port with rows and adds what only lapa can give: drafts, proposals,
+sharing, a section in two documents.
+
 ## Vocabulary
 
 A **document** is a row that orders sections. A chapter of the course is a
@@ -142,7 +152,7 @@ it is the price of an id that never drifts.
 runs | the block the editor holds while it has focus
 keyed array | the section's one content field
 record | one row, synced whole and merged against its base
-tilia | one tracked entry per block, keyed by id
+binding | one tracked entry per block, keyed by id
 view | only the block whose entry changed re-renders
 ```
 
@@ -150,6 +160,42 @@ A remote edit landing in the block that has focus is the delicate case. The
 local runs stay the source while the block is focused. The merged text
 arrives, a diff of the old text against the new gives an offset map, and the
 caret moves through it. The typist never sees the caret jump.
+
+## The port
+
+The editor and its host meet at one boundary, and a section crosses it as a
+list of blocks, each block its id and its text in canonical markdown. The
+host stores strings and never sees a mark. The editor reads a block's
+markdown into runs when it renders it, and writes runs back to markdown when
+it hands the block out. Runs never leave the editor.
+
+```schema What crosses the port: a section, one id and one markdown string per block
+Section compactness
+  a A space is compact when every open cover has a finite subcover.
+  b **Compactness** is preserved by continuous images.
+  c ~ Video Covering the circle
+```
+
+The port itself is two things, both plain data. The sections the host has
+given the editor to edit, by id, and one call, `update`, that the editor
+makes with the sections an act changed, whole, once per act. The core
+observes nothing. Making a change re-render is the rendering binding's job:
+it holds the sections in a tilia tree, re-reads a section the host wrote,
+and re-renders the blocks whose entries changed. An in-memory store for
+tests is the same port with `update` writing back into the sections.
+Debouncing keystrokes is the host's choice, not the editor's.
+
+```flow One act, from the key to the host
+act | enter, a typed letter, bold over a selection
+model | a pure edit on runs and offsets
+section | the changed blocks written back as markdown
+update | the host receives the section, whole
+```
+
+Embeds are opaque to the editor. An embed block is a fenced dictionary with
+a type and parameters, rendered through a component the host injects for
+that type. The editor never asks what the id means. The lapa binding
+supplies the components that resolve it to a row.
 
 ## Files
 
@@ -323,5 +369,5 @@ one block in React | beforeinput, composition, selection restore
 across blocks | cross-block selection and block-selection mode
 copy and paste | both clipboard formats, the paste batch
 undo | the stack of inverse edits
-lapa | the keyed array, its sequence merge, tilia keyed by block id
+lapa | the keyed array, its sequence merge, rows bound through the port
 ```

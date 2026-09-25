@@ -1,7 +1,7 @@
 Read `docs/content/pages/EDITOR.md` before changing the editor. It settles
 the vocabulary, the model, the input layer and the order of work.
 
-The fixtures under `packages/model/src/design/operations/` are the editor's
+The fixtures under `packages/editor/src/design/` are the editor's
 contract. Every scenario writes its document in the notation described on
 the Operations page of `docs/`.
 

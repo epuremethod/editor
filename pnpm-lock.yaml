@@ -10,9 +10,9 @@ importers:
 
   docs:
     dependencies:
-      '@editor/model':
+      '@epure/editor':
         specifier: workspace:^
-        version: link:../packages/model
+        version: link:../packages/editor
       '@epure/minidoc':
         specifier: 0.1.0
         version: 0.1.0(rescript@12.3.1)
@@ -26,7 +26,7 @@ importers:
         specifier: 2.9.0
         version: 2.9.0
 
-  packages/model:
+  packages/editor:
     devDependencies:
       '@epure/vitest':
         specifier: 2.0.0

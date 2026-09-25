@@ -1,7 +1,7 @@
 {
-  "name": "@editor/model",
+  "name": "@epure/editor",
   "version": "0.0.0",
-  "description": "The editor's model: blocks, runs, marks and the pure edits over them. No DOM.",
+  "description": "The core of a block editor over sections of markdown: the types, the pure model, the notation and the storage port. Depends on nothing.",
   "type": "module",
   "engines": {
     "node": ">=22"

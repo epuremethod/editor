@@ -1,0 +1,67 @@
+feature: Storage
+background:
+  given: a stored section
+examples:
+  - scenario: plain text reads into a block and writes back as it was
+    blocks:
+      - A topology on a set X is a collection of subsets called open sets.
+      - The empty set and X itself are open.
+
+  - scenario: every mark reads and writes back in its one form
+    blocks:
+      - "**Every** open ball is an _open_ set."
+      - "**_Compact_** subsets of a Hausdorff space are closed."
+      - "See [compactness](/compactness) for the finite subcover property."
+      - "[**_Heine–Borel_**](/heine-borel) gives the compact subsets of the line."
+      - "The set `U` is open in X."
+
+  - scenario: a delimiter inside a code span is text
+    blocks:
+      - "A code span keeps its stars: `a * b` and `**x**`."
+
+  - scenario: a literal delimiter keeps its backslash
+    blocks:
+      - "A literal \\*star\\* and a literal \\_underscore\\_."
+      - "Brackets in a link: [the \\[open\\] sets](/open-sets)."
+      - "A parenthesis in an href: [a](/a\\)b)."
+
+  - scenario: the markers of the notation are text on the port
+    blocks:
+      - "A pipe | and braces {x} are text here."
+
+  - scenario: an empty block is an empty line
+    blocks:
+      - "Every metric space is Hausdorff."
+      - ""
+      - "The converse fails."
+
+  - scenario: two bold runs parted by a space become one
+    blocks:
+      - "**Open** **sets** are closed under unions."
+    canonical:
+      - "**Open sets** are closed under unions."
+
+  - scenario: a space inside the edge of a bold run steps out of it
+    blocks:
+      - "**Open ** sets are closed under unions."
+    canonical:
+      - "**Open**  sets are closed under unions."
+
+  - scenario: an edit hands the section back whole, with its ids and no caret
+    given: an editor over a section
+    before: |
+      @a A set is **closed|** when its complement is open.
+      @b Both the empty set and X are closed.
+    when: "input(A set is closed sets| when its complement is open.)"
+    update: |
+      @a A set is **closed sets** when its complement is open.
+      @b Both the empty set and X are closed.
+
+  - scenario: a split hands back the new block with its minted id
+    given: an editor over a section
+    before: |
+      @a A map f from X to Y is continuous when| the preimage of every open set is open.
+    when: enter
+    update: |
+      @a A map f from X to Y is continuous when
+      @b the preimage of every open set is open.

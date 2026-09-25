@@ -8,5 +8,5 @@ await dev({
   glob: "content/config.yaml",
   build: "src/build.mjs",
   root,
-  watch: [`${workspace}tech.md`, `${workspace}packages/model/src/design`],
+  watch: [`${workspace}docs/content/pages`, `${workspace}packages/editor/src/design`],
 })

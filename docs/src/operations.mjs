@@ -4,7 +4,7 @@
 // shows exactly what the test reads.
 
 import {parse} from "yaml"
-import {read} from "@editor/model/src/domain/feature/Notation.res.mjs"
+import {read} from "@epure/editor/src/domain/feature/Notation.res.mjs"
 import {slugify} from "./markdown.mjs"
 
 function escape(value) {

@@ -1,9 +1,10 @@
 // One line of inline markdown, read into runs and written back out of them.
 // The form is canonical: `**bold**`, `_italic_`, `` `code` `` and
 // `[text](href)`, nested link outside, then bold, then italic, then code.
-// A backslash keeps the character after it literal. The line may carry the
-// notation's markers, `|` for the caret and `{` `}` for a selection, at any
-// place; where a marker sits among the delimiters says which marks it holds.
+// A backslash keeps the character after it literal. In the notation the
+// line may carry markers, `|` for the caret and `{` `}` for a selection, at
+// any place; where a marker sits among the delimiters says which marks it
+// holds. On the port there are no markers: those characters are text.
 
 type marker = Caret | Open | Close
 
@@ -17,7 +18,7 @@ type entry = {mutable kind: Doc.kind, start: int}
 
 let fail = message => panic(`Inline: ${message}`)
 
-let read = (source: string): read => {
+let read = (source: string, ~notation=true): read => {
   let text = ref("")
   let stack: array<entry> = []
   let marks: array<Doc.mark> = []
@@ -52,7 +53,7 @@ let read = (source: string): read => {
       }
       literal(peek(1))
       index := index.contents + 2
-    | "|" | "{" | "}" =>
+    | "|" | "{" | "}" if notation =>
       let marker = switch character {
       | "|" => Caret
       | "{" => Open
@@ -139,7 +140,21 @@ let read = (source: string): read => {
   }
 }
 
-let escape = (text: string) => text->String.replaceRegExp(/[\\|{}*_`\[\]]/g, "\\$&")
+// The characters a text keeps literal with a backslash: the delimiters, and
+// in the notation the markers too. Inside a code span only the markers need
+// it, since a delimiter there is text.
+let escape = (text: string, ~code, ~notation) => {
+  let pattern = switch (code, notation) {
+  | (true, true) => /[|{}]/g
+
+  | (true, false) => /(?!)/g
+
+  | (false, true) => /[\\|{}*_`\[\]]/g
+
+  | (false, false) => /[\\*_`\[\]]/g
+  }
+  text->String.replaceRegExp(pattern, "\\$&")
+}
 
 let escapeHref = (href: string) => href->String.replaceRegExp(/[\\)]/g, "\\$&")
 
@@ -167,7 +182,7 @@ let prefixOf = (a: array<Doc.kind>, b: array<Doc.kind>) =>
   a->Array.length <= b->Array.length &&
     a->Array.everyWithIndex((kind, index) => b->Array.get(index) == Some(kind))
 
-let write = (content: Doc.text, ~points: array<point>=[]): string => {
+let write = (content: Doc.text, ~points: array<point>=[], ~notation=true): string => {
   let text = content.text
   let length = text->String.length
   let boundaries = [0, length]
@@ -237,7 +252,14 @@ let write = (content: Doc.text, ~points: array<point>=[]): string => {
     | _ => ()
     }
     switch boundaries->Array.get(index + 1) {
-    | Some(next) => emit(escape(text->String.slice(~start=offset, ~end=next)))
+    | Some(next) =>
+      emit(
+        escape(
+          text->String.slice(~start=offset, ~end=next),
+          ~code=Runs.has(target, Code),
+          ~notation,
+        ),
+      )
     | None => ()
     }
   })

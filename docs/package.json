@@ -6,14 +6,14 @@
     "node": ">=22"
   },
   "scripts": {
-    "prebuild": "pnpm --filter @editor/model res:build",
+    "prebuild": "pnpm --filter @epure/editor res:build",
     "build": "node src/build.mjs",
     "dev": "node src/dev.mjs",
     "check": "pnpm build && node --test src/*.test.mjs",
     "test": "pnpm check"
   },
   "dependencies": {
-    "@editor/model": "workspace:^",
+    "@epure/editor": "workspace:^",
     "@epure/minidoc": "0.1.0",
     "markdown-it": "14.3.0",
     "markdown-it-anchor": "9.2.0",

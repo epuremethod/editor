@@ -3,7 +3,7 @@
 Every edit is a pure function on the model. This page shows each one as a
 card: the document before, the act, and the document after. The cards are
 drawn from the same YAML fixtures that `@epure/vitest` runs, under
-`packages/model/src/design/operations/`, so a card and its test cannot drift
+`packages/editor/src/design/operations/`, so a card and its test cannot drift
 apart.
 
 ## The notation
