@@ -27,7 +27,7 @@ given1("an editor over a section", (_on, example: edit) => {
   let {doc} = Notation.read(example.before)
   let received = ref([])
   let storage: Section.storage = {
-    sections: Dict.fromArray([("s", Storage.write(doc, ~id="s"))]),
+    sections: [Storage.write(doc, ~id="s")],
     update: sections => received := sections,
   }
   let result = Steps.acts(example.when_)->Array.reduce(doc, Steps.act)

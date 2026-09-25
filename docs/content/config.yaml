@@ -1,7 +1,10 @@
 var:
   output: ../dist
   favicon: >-
-    data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext x='16' y='25' text-anchor='middle' font-family='Helvetica,Arial,sans-serif' font-weight='bold' font-size='26' fill='%23000'%3Ee%3C/text%3E%3C/svg%3E
+    data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32
+    32'%3E%3Ctext x='16' y='25' text-anchor='middle'
+    font-family='Helvetica,Arial,sans-serif' font-weight='bold' font-size='26'
+    fill='%23000'%3Ee%3C/text%3E%3C/svg%3E
   indexCurrent: ""
   operationsCurrent: ""
   indexToc: ""
@@ -38,30 +41,63 @@ var:
       </main>
     </body>
     </html>
+  port: 62924
 build:
   - output: "{{output}}/index.html"
     input: "{{shell}}"
     var:
       title: Editor
       running: Model
-      pageBody: {file: pages/EDITOR.md, transform: docsMd}
-      indexToc: {file: pages/EDITOR.md, transform: docsToc}
+      pageBody: { file: pages/EDITOR.md, transform: docsMd }
+      indexToc: { file: pages/EDITOR.md, transform: docsToc }
       indexCurrent: ' aria-current="page"'
   - output: "{{output}}/operations.html"
     input: "{{shell}}"
     var:
       title: Operations — Editor
       running: Operations
-      joinOps: {file: ../../packages/editor/src/design/operations/join.yaml, transform: operations}
-      splitOps: {file: ../../packages/editor/src/design/operations/split.yaml, transform: operations}
-      inputOps: {file: ../../packages/editor/src/design/operations/input.yaml, transform: operations}
-      marksOps: {file: ../../packages/editor/src/design/operations/marks.yaml, transform: operations}
-      caretOps: {file: ../../packages/editor/src/design/operations/caret.yaml, transform: operations}
-      deleteOps: {file: ../../packages/editor/src/design/operations/delete.yaml, transform: operations}
-      moveOps: {file: ../../packages/editor/src/design/operations/move.yaml, transform: operations}
-      pasteOps: {file: ../../packages/editor/src/design/operations/paste.yaml, transform: operations}
-      pageBody: {file: pages/OPERATIONS.md, transform: docsMd}
-      operationsToc: {file: pages/OPERATIONS.md, transform: docsToc}
+      joinOps:
+        {
+          file: ../../packages/editor/src/design/operations/join.yaml,
+          transform: operations
+        }
+      splitOps:
+        {
+          file: ../../packages/editor/src/design/operations/split.yaml,
+          transform: operations
+        }
+      inputOps:
+        {
+          file: ../../packages/editor/src/design/operations/input.yaml,
+          transform: operations
+        }
+      marksOps:
+        {
+          file: ../../packages/editor/src/design/operations/marks.yaml,
+          transform: operations
+        }
+      caretOps:
+        {
+          file: ../../packages/editor/src/design/operations/caret.yaml,
+          transform: operations
+        }
+      deleteOps:
+        {
+          file: ../../packages/editor/src/design/operations/delete.yaml,
+          transform: operations
+        }
+      moveOps:
+        {
+          file: ../../packages/editor/src/design/operations/move.yaml,
+          transform: operations
+        }
+      pasteOps:
+        {
+          file: ../../packages/editor/src/design/operations/paste.yaml,
+          transform: operations
+        }
+      pageBody: { file: pages/OPERATIONS.md, transform: docsMd }
+      operationsToc: { file: pages/OPERATIONS.md, transform: docsToc }
       operationsCurrent: ' aria-current="page"'
   - output: "{{output}}/style.css"
-    input: {copy: ../assets/style.css}
+    input: { copy: ../assets/style.css }

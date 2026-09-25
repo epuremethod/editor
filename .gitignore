@@ -9,3 +9,7 @@ docs/dist/
 
 # Claude Code local permissions, one machine only.
 .claude/settings.local.json
+
+# The binding's Vite bundle.
+packages/tilia/dist/
+packages/tilia/test-results/

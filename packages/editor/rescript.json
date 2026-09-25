@@ -8,11 +8,11 @@
       "subdirs": [
         {
           "dir": "api",
-          "public": []
+          "public": "all"
         },
         {
           "dir": "feature",
-          "public": []
+          "public": "all"
         }
       ]
     },

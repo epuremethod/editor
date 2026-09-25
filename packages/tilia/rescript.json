@@ -1,0 +1,25 @@
+{
+  "name": "@tilia/editor",
+  "namespace": "TiliaEditor",
+  "sources": [
+    {
+      "dir": "src/view",
+      "public": ["View"],
+      "subdirs": [
+        {
+          "dir": "app",
+          "type": "dev"
+        }
+      ]
+    }
+  ],
+  "package-specs": {
+    "module": "esmodule",
+    "in-source": true
+  },
+  "suffix": ".res.mjs",
+  "jsx": {
+    "version": 4
+  },
+  "dependencies": ["@epure/editor", "tilia", "@tilia/react", "@rescript/react"]
+}

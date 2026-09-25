@@ -97,19 +97,24 @@ A mark extends when typing reaches its end, unless it is a link. No mark
 extends at its start. A toggle over a selection adds the mark to all of it or
 removes it from all of it, keeps the selection, and skips any code span. On a
 caret a toggle stores a pending mark for the next typed character.
+Punctuation typed at the end of a run lands outside it, so a sentence that
+ends on a bold word or a code span ends plain. A space typed at the end of a
+bold run keeps the run pending, so the next word rejoins it; a space typed
+at the end of a code span lands outside, since a span is one identifier.
+The keys are Cmd+B, Cmd+I and Cmd+E.
 
 {{marksOps}}
 
 ## Caret
 
-An arrow moves the caret one character. At the end of a block it crosses to
-the next one. At a mark boundary the first press changes side without moving
-in the text, and the second press moves: `**open|**` becomes `**open**|`, and
-typing there is not bold. One press crosses every mark that ends at the
-caret. After typing, the pending marks are the ones the typed text took.
-After a deletion they follow the character before the caret, so backspace
-from outside a run lands inside it. Up and down depend on line layout and
-belong to the view, not the model.
+An arrow moves the caret one character, and at the end of a block it
+crosses to the next one. Wherever it lands, by arrow or by click, the caret
+takes the marks of its place: inside a bold, italic or code run at its end,
+outside a link at its end, outside any run at its start. Cmd+B takes the
+other side. After typing, the pending marks are the ones the last typed
+character took. After a deletion they follow the character before the
+caret. Up and down depend on line layout and belong to the view, not the
+model.
 
 {{caretOps}}
 

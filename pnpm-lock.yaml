@@ -41,6 +41,43 @@ importers:
         specifier: ^3.2.4
         version: 3.2.7(yaml@2.9.0)
 
+  packages/tilia:
+    dependencies:
+      '@epure/editor':
+        specifier: workspace:^
+        version: link:../editor
+    devDependencies:
+      '@playwright/test':
+        specifier: ^1.63.0
+        version: 1.63.0
+      '@rescript/react':
+        specifier: ^0.15.0
+        version: 0.15.0(@rescript/runtime@12.3.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      '@rescript/runtime':
+        specifier: ^12.3.0
+        version: 12.3.1
+      '@tilia/react':
+        specifier: 6.0.0-beta.20260820T171602
+        version: 6.0.0-beta.20260820T171602(react@19.3.0)
+      react:
+        specifier: ^19.2.0
+        version: 19.3.0
+      react-dom:
+        specifier: ^19.2.0
+        version: 19.3.0(react@19.3.0)
+      rescript:
+        specifier: ^12.3.0
+        version: 12.3.1
+      tilia:
+        specifier: 6.0.0-beta.20260820T171602
+        version: 6.0.0-beta.20260820T171602
+      vite:
+        specifier: ^7.1.0
+        version: 7.3.6(yaml@2.9.0)
+      yaml:
+        specifier: 2.9.0
+        version: 2.9.0
+
 packages:
 
   '@cucumber/gherkin@32.2.0':
@@ -225,6 +262,11 @@ packages:
     os: [linux]
     libc: [glibc]
 
+  '@playwright/test@1.63.0':
+    resolution: {integrity: sha512-oxMK4vllB9RK5NQ2l1pq1IfOf2AvnEuj/vYGDj0H2nMtmtZpKtCwt/l00GEO6xjGfpBNAvjovvYdCm50dRQkpQ==}
+    engines: {node: '>=20'}
+    hasBin: true
+
   '@rescript/darwin-arm64@12.3.1':
     resolution: {integrity: sha512-pwdnHhuIMH4Y5nuEwBLAMOYvGIcAVgnSZq/DWUNZJWoUr7YZpNkABJp0TFGiyYePT5ld+nvjQ40oI0rKjEWK8w==}
     engines: {node: '>=20.11.0'}
@@ -248,6 +290,13 @@ packages:
     engines: {node: '>=20.11.0'}
     cpu: [x64]
     os: [linux]
+
+  '@rescript/react@0.15.0':
+    resolution: {integrity: sha512-qDrrgxYzxRL/pjug617u5Q4+aqEfV5g+GQnd+eCWb0XqPrKucaDzN5rirDUZPg8UrqU/AvCP8Ev5cFd+MJx88A==}
+    peerDependencies:
+      '@rescript/runtime': '>=12.0.0'
+      react: '>=19.2.0'
+      react-dom: '>=19.2.0'
 
   '@rescript/runtime@12.3.0':
     resolution: {integrity: sha512-8SRM2f6+LaWach8NJjYQVCCmu6KYmJCb+437L7YpaUpJBDyUOC1x0FF75shZ/Gid9guKPF3zMHrTNHLuyQkkiQ==}
@@ -398,6 +447,11 @@ packages:
     resolution: {integrity: sha512-ypfC34F3RKXvCXBglGqGMsUSMKlgwd1HX9AOAlx9RoZZ6GaI42YHVeKpzg3JG+wpBUJYTG+NNZhqbDWL8tBZkw==}
     cpu: [x64]
     os: [win32]
+
+  '@tilia/react@6.0.0-beta.20260820T171602':
+    resolution: {integrity: sha512-K5t6yzjiMKGtBDSC5L9+LzJUNhWYWPYwAsa+JphsAsGBZyIgps9p9M9k3zSZzrXAAQFH4jTWoR8I2/BkUvMPFA==}
+    peerDependencies:
+      react: '*'
 
   '@types/chai@5.2.3':
     resolution: {integrity: sha512-Mw558oeA9fFbv65/y4mHtXDs9bPnFMZAL/jxdPFUpOHHIXX91mcgEHbS5Lahr+pwZFR8A7GQleRWeI6cGFC2UA==}
@@ -569,6 +623,16 @@ packages:
     resolution: {integrity: sha512-qcJu88Q2IWqJsDD529JKMdwGm/dvInW4HvQnRwiH9JtihJvzGOscDtHE3x1pBKeUOTysQ8kVmLnJ2kJu7yhcGA==}
     engines: {node: '>=12'}
 
+  playwright-core@1.63.0:
+    resolution: {integrity: sha512-rYCsBF/M5HjUch52bbtVONEFjv6Xu8sm8h72dNlR5bzIE1fvC/bxgspzkjSfU+MweEMmPM8KJebG6nnyxo5mCg==}
+    engines: {node: '>=20'}
+    hasBin: true
+
+  playwright@1.63.0:
+    resolution: {integrity: sha512-+7ziBLidS4NaNCdt57SUDT+wYmmd5fmiQejUic/kb+YsYSCPyOOE9sebzMjNmQrsnNpDJqd4WHvV/8lfKfUDUg==}
+    engines: {node: '>=20'}
+    hasBin: true
+
   postcss@8.5.28:
     resolution: {integrity: sha512-RRuzqDtt5Y9h3quz5hWhK+TPnsmVs6WwSU6LkJMeY4HstUEDuYTG8UJSdawMRzmzAtV+KEoG8N3Qg2qLy5vM/A==}
     engines: {node: ^10 || ^12 || >=14}
@@ -576,6 +640,15 @@ packages:
   punycode.js@2.3.1:
     resolution: {integrity: sha512-uxFIHU0YlHYhDQtV4R9J6a52SLx28BCjT+4ieh7IGbgwVJWO+km431c4yRlREUAsAmt/uMjQUyQHNEPf0M39CA==}
     engines: {node: '>=6'}
+
+  react-dom@19.3.0:
+    resolution: {integrity: sha512-JDk8dgif51OjFoDE70+OT9ICyYr+69HlmihNwp1+Nsfbna3t5sIiCa9ZJktDmQ4/1b/rn26hIAR2uYXDMr5r0Q==}
+    peerDependencies:
+      react: ^19.3.0
+
+  react@19.3.0:
+    resolution: {integrity: sha512-E8LUcbtBWt20bbl2YoHfx4ZDBdxVTfOKtCZn9cDSJ4l6/nuoApcpIBcj47t2wZoVX8g2ZHuMHbiShgCR1T5Sog==}
+    engines: {node: '>=0.10.0'}
 
   reflect-metadata@0.2.2:
     resolution: {integrity: sha512-urBwgfrvVP/eAyXx4hluJivBKzuEbSQs9rKWCrCkbSxNv8mxPcUZKeuoF3Uy4mJl3Lwprp6yy5/39VWigZ4K6Q==}
@@ -589,6 +662,9 @@ packages:
     resolution: {integrity: sha512-KRWwmNLlPw5M7HcdYfm15oBv9n9LPtjzpzCIxS/phwqvPyxHSoKX6Y2YU3pxSPfy0CLquVgsx/j/hBi6OvH1Nw==}
     engines: {node: '>=18.0.0', npm: '>=8.0.0'}
     hasBin: true
+
+  scheduler@0.28.0:
+    resolution: {integrity: sha512-juorfCmIkIw8tT+p5BXSm6PJjQF/ycEYmKyzURCIt/RaZIhL+PulbQ9Yu2z1HdOJDdqDTlxA1+xKBmHXJsczAw==}
 
   siginfo@2.0.0:
     resolution: {integrity: sha512-ybx0WO1/8bSBLEWXZvEd7gMW3Sn3JFlW3TvX1nREbDLRNQNaeNN8WK0meBwPdAaOI7TtRRRJn/Es1zhrrCHu7g==}
@@ -620,6 +696,9 @@ packages:
 
   tilia@5.2.0:
     resolution: {integrity: sha512-GWJg/4Foy9ELut+CnoOMiA38fHdVnZBwtqyLbQiGXf9vWZcF/pKxRfwn0hbYVBN7pcwAHuzTojbjLzur8XmD6A==}
+
+  tilia@6.0.0-beta.20260820T171602:
+    resolution: {integrity: sha512-wahY71BUhLZzCzZ0si9gyNIY1ZMyAzcWat2IW0nsQIkK/YnzNtZ5uZ3z4KMBhx6l+uurmwykXLg9FIcfGgZyWw==}
 
   tinybench@2.9.0:
     resolution: {integrity: sha512-0+DUvqWMValLmha6lr4kD8iAMK1HzV0/aKnCtWb9v9641TnP/MFb7Pc2bxoxQjTXAErryXVgUOfv2YqNllqGeg==}
@@ -847,6 +926,10 @@ snapshots:
   '@napi-rs/lzma-linux-x64-gnu@1.5.1':
     optional: true
 
+  '@playwright/test@1.63.0':
+    dependencies:
+      playwright: 1.63.0
+
   '@rescript/darwin-arm64@12.3.1':
     optional: true
 
@@ -858,6 +941,12 @@ snapshots:
 
   '@rescript/linux-x64@12.3.1':
     optional: true
+
+  '@rescript/react@0.15.0(@rescript/runtime@12.3.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)':
+    dependencies:
+      '@rescript/runtime': 12.3.1
+      react: 19.3.0
+      react-dom: 19.3.0(react@19.3.0)
 
   '@rescript/runtime@12.3.0': {}
 
@@ -940,6 +1029,11 @@ snapshots:
 
   '@rollup/rollup-win32-x64-msvc@4.63.5':
     optional: true
+
+  '@tilia/react@6.0.0-beta.20260820T171602(react@19.3.0)':
+    dependencies:
+      react: 19.3.0
+      tilia: 6.0.0-beta.20260820T171602
 
   '@types/chai@5.2.3':
     dependencies:
@@ -1115,6 +1209,12 @@ snapshots:
 
   picomatch@4.0.7: {}
 
+  playwright-core@1.63.0: {}
+
+  playwright@1.63.0:
+    dependencies:
+      playwright-core: 1.63.0
+
   postcss@8.5.28:
     dependencies:
       nanoid: 3.3.19
@@ -1122,6 +1222,13 @@ snapshots:
       source-map-js: 1.2.1
 
   punycode.js@2.3.1: {}
+
+  react-dom@19.3.0(react@19.3.0):
+    dependencies:
+      react: 19.3.0
+      scheduler: 0.28.0
+
+  react@19.3.0: {}
 
   reflect-metadata@0.2.2: {}
 
@@ -1167,6 +1274,8 @@ snapshots:
       '@rollup/rollup-win32-x64-msvc': 4.63.5
       fsevents: 2.3.3
 
+  scheduler@0.28.0: {}
+
   siginfo@2.0.0: {}
 
   source-map-js@1.2.1: {}
@@ -1186,6 +1295,8 @@ snapshots:
       rescript: 12.3.1
 
   tilia@5.2.0: {}
+
+  tilia@6.0.0-beta.20260820T171602: {}
 
   tinybench@2.9.0: {}
 

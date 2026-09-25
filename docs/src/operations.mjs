@@ -137,6 +137,7 @@ const keys = {
   moveUp: "⇧↑",
   moveDown: "⇧↓",
   paste: "⌘V",
+  click: "⌖",
 }
 
 function sign(name) {

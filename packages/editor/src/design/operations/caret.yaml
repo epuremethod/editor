@@ -41,59 +41,45 @@ examples:
     after: |
       The closure of A is the smallest closed set containing A.|
 
-  - scenario: right at the end of a run steps out of it before it moves
+  - scenario: right at the end of a run moves on, and the caret lands plain
     before: |
       An **open|** cover of X is a family of open sets.
-    when: ->
-    after: |
-      An **open**| cover of X is a family of open sets.
-
-  - scenario: the next right moves in the text
-    before: |
-      An **open**| cover of X is a family of open sets.
     when: ->
     after: |
       An **open** |cover of X is a family of open sets.
 
-  - scenario: left from outside a run steps into it
+  - scenario: right to the end of a run lands inside it
     before: |
-      An **open**| cover of X is a family of open sets.
+      An **ope|n** cover of X is a family of open sets.
+    when: ->
+    after: |
+      An **open|** cover of X is a family of open sets.
+
+  - scenario: right into a run lands inside it
+    before: |
+      Every |**open** set is a union of basis members.
+    when: ->
+    after: |
+      Every **o|pen** set is a union of basis members.
+
+  - scenario: left from after a run lands inside it
+    before: |
+      An **open** |cover of X is a family of open sets.
     when: <-
     after: |
       An **open|** cover of X is a family of open sets.
 
-  - scenario: right before a run steps into it
+  - scenario: right to the end of a link lands outside it
     before: |
-      Every |**open** set is a union of basis members.
+      See [compactnes|s](/compactness) for the finite subcover property.
     when: ->
     after: |
-      Every **|open** set is a union of basis members.
-
-  - scenario: left at the start of a run steps out of it
-    before: |
-      Every **|open** set is a union of basis members.
-    when: <-
-    after: |
-      Every |**open** set is a union of basis members.
-
-  - scenario: one step crosses every mark that ends at the caret
-    before: |
-      A space is **_compact|_** when every open cover has a finite subcover.
-    when: ->
-    after: |
-      A space is **_compact_**| when every open cover has a finite subcover.
-
-  - scenario: left into a link lets typing extend it
-    before: |
       See [compactness](/compactness)| for the finite subcover property.
-    when: [<-, "input(See compactness,| for the finite subcover property.)"]
-    after: |
-      See [compactness,|](/compactness) for the finite subcover property.
 
-  - scenario: typing after stepping out of a run is not marked
+  - scenario: typing with bold toggled off at the end of a run is not marked
     before: |
-      An **open**| cover of X is a family of open sets.
-    when: input(An opens| cover of X is a family of open sets.)
+      An **open|** cover of X is a family of open sets.
+    when: [bold, input(An opens| cover of X is a family of open sets.)]
     after: |
       An **open**s| cover of X is a family of open sets.
 
@@ -110,3 +96,24 @@ examples:
     when: backspace
     after: |
       Every open ball is a| open set.
+
+  - scenario: a caret placed at the end of a bold run is inside it
+    before: |
+      An **open** cover of X is a family of open sets.
+    when: click(An open| cover of X is a family of open sets.)
+    after: |
+      An **open|** cover of X is a family of open sets.
+
+  - scenario: a caret placed at the end of a link is outside it
+    before: |
+      The proof uses the [Heine–Borel theorem](/heine-borel) twice.
+    when: click(The proof uses the Heine–Borel theorem| twice.)
+    after: |
+      The proof uses the [Heine–Borel theorem](/heine-borel)| twice.
+
+  - scenario: a caret placed at the start of a run is outside it
+    before: |
+      Every **open** set is a union of basis members.
+    when: click(Every |open set is a union of basis members.)
+    after: |
+      Every |**open** set is a union of basis members.

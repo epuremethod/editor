@@ -241,26 +241,54 @@ let back = (text: string, offset: int) =>
     ? offset - 2
     : offset - 1
 
-// The caret states at an offset, from the left side to the right: inside
-// the marks that end there, between, inside the marks that start there.
-// Each state is the set of pending marks it stands for.
-let states = (text: Doc.text, offset: int): array<array<Doc.kind>> => {
+let isLink = (kind: Doc.kind) =>
+  switch kind {
+  | Link(_) => true
+  | _ => false
+  }
+
+// The marks a caret holds when it is placed at an offset, by a click or an
+// arrow: the marks around it, and the bold, italic or code run that ends
+// there. A link that ends there is left, and a run that starts there is not
+// entered.
+let placed = (text: Doc.text, offset: int): array<Doc.kind> => {
   let common =
     text.marks
     ->Array.filter(mark => mark.start < offset && mark.stop > offset)
     ->Array.map(mark => mark.kind)
-  let ending = text.marks->Array.filter(mark => mark.stop == offset)->Array.map(mark => mark.kind)
-  let starting =
-    text.marks->Array.filter(mark => mark.start == offset)->Array.map(mark => mark.kind)
-  let out = []
-  let push = kinds => {
-    let state = sorted(kinds)
-    if !(out->Array.some(seen => seen == state)) {
-      out->Array.push(state)
-    }
+  let ending =
+    text.marks
+    ->Array.filter(mark => mark.stop == offset && mark.start < offset && !isLink(mark.kind))
+    ->Array.map(mark => mark.kind)
+  sorted(common->Array.concat(ending))
+}
+
+// The length of the punctuation a text starts with, spaces counted too
+// when `spaces` says so.
+let punctuation = (text: string, ~spaces=false) =>
+  switch (spaces ? /^[\p{P}\s]+/u : /^\p{P}+/u)->RegExp.exec(text) {
+  | Some(found) => found->RegExp.Result.fullMatch->String.length
+  | None => 0
   }
-  push(common->Array.concat(ending))
-  push(common)
-  push(common->Array.concat(starting))
-  out
+
+// The text cut at every mark boundary: each piece with the kinds that
+// cover it, in nesting order. What a view renders and what a writer emits.
+let segments = (text: Doc.text): array<(string, array<Doc.kind>)> => {
+  let length = text.text->String.length
+  let cuts = [0, length]
+  text.marks->Array.forEach(mark => {
+    cuts->Array.push(mark.start)
+    cuts->Array.push(mark.stop)
+  })
+  let sorted = cuts->Array.toSorted(Int.compare)
+  let offsets =
+    sorted->Array.filterWithIndex((offset, index) =>
+      index == 0 || sorted->Array.getUnsafe(index - 1) != offset
+    )
+  offsets->Array.filterMapWithIndex((offset, index) =>
+    switch offsets->Array.get(index + 1) {
+    | Some(next) => Some((text.text->String.slice(~start=offset, ~end=next), at(text, offset)))
+    | None => None
+    }
+  )
 }

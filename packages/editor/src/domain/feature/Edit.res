@@ -256,6 +256,15 @@ let input = (doc: Doc.t, ~text: string, ~anchor: int, ~focus: int): Doc.t =>
     let to = oldLength - suffix
     let inserted = text->String.slice(~start=prefix, ~end=newLength - suffix)
     let kinds = to > from ? Runs.at(old, from) : selection.pending
+    // Punctuation typed at the end of a run lands outside it, and so does
+    // a space typed at the end of a code span: what is typed then drops the
+    // marks that end at the caret, and the caret keeps what it took.
+    let ending =
+      old.marks
+      ->Array.filter(mark => mark.stop == from && mark.start < from)
+      ->Array.map(mark => mark.kind)
+    let outside = to == from && Runs.punctuation(inserted, ~spaces=Runs.has(ending, Code)) > 0
+    let kinds = outside ? kinds->Array.filter(kind => !Runs.has(ending, kind)) : kinds
     let content = Runs.splice(
       old,
       ~from,
@@ -364,47 +373,39 @@ let link = (doc: Doc.t, ~href: string): Doc.t =>
     })
   }
 
-let stateIndex = (states: array<array<Doc.kind>>, pending) =>
-  states->Array.findIndexOpt(state => state == pending)
+// Places the selection where a click or a drag put it. A caret takes the
+// marks of its place; a range holds no pending marks.
+let select = (doc: Doc.t, ~anchor: Doc.point, ~focus: Doc.point): Doc.t => {
+  let pending =
+    anchor == focus
+      ? Runs.placed(blockAt(doc, indexOf(doc, focus.block)).content, focus.offset)
+      : []
+  {...doc, selection: Some({anchor, focus, pending})}
+}
 
-// Moves the caret one character forward. At a mark boundary the first step
-// changes side without moving in the text. At the end of a block it moves
-// to the start of the next one.
+let placeAt = (doc: Doc.t, point: Doc.point) => select(doc, ~anchor=point, ~focus=point)
+
+// Moves the caret one character forward and places it there. At the end of
+// a block it moves to the start of the next one. A range collapses to its
+// end.
 let right = (doc: Doc.t): Doc.t =>
   switch doc.selection {
   | None => doc
   | Some(selection) if !collapsed(selection) =>
     let (_, stop) = ordered(doc, selection)
-    let content = blockAt(doc, indexOf(doc, stop.block)).content
-    let states = Runs.states(content, stop.offset)
-    {
-      ...doc,
-      selection: caret(stop.block, stop.offset, states->Array.getUnsafe(states->Array.length - 1)),
-    }
-  | Some({focus: {block, offset}, pending}) =>
+    placeAt(doc, stop)
+  | Some({focus: {block, offset}}) =>
     let index = indexOf(doc, block)
     let content = blockAt(doc, index).content
-    let states = Runs.states(content, offset)
-    let at = stateIndex(states, pending)->Option.getOr(states->Array.length - 1)
-    switch states->Array.get(at + 1) {
-    | Some(next) => {...doc, selection: caret(block, offset, next)}
-    | None =>
-      if offset < content.text->String.length {
-        let offset = Runs.forward(content.text, offset)
-        {...doc, selection: caret(block, offset, Runs.states(content, offset)->Array.getUnsafe(0))}
-      } else {
-        switch doc.blocks->Array.get(index + 1) {
-        | Some(next) => {
-            ...doc,
-            selection: caret(next.id, 0, Runs.states(next.content, 0)->Array.getUnsafe(0)),
-          }
-        | None => doc
-        }
+    if offset < content.text->String.length {
+      placeAt(doc, {block, offset: Runs.forward(content.text, offset)})
+    } else {
+      switch doc.blocks->Array.get(index + 1) {
+      | Some(next) => placeAt(doc, {block: next.id, offset: 0})
+      | None => doc
       }
     }
   }
-
-let last = (states: array<array<Doc.kind>>) => states->Array.getUnsafe(states->Array.length - 1)
 
 // Moves the caret one character back, the mirror of `right`.
 let left = (doc: Doc.t): Doc.t =>
@@ -412,30 +413,16 @@ let left = (doc: Doc.t): Doc.t =>
   | None => doc
   | Some(selection) if !collapsed(selection) =>
     let (start, _) = ordered(doc, selection)
-    let content = blockAt(doc, indexOf(doc, start.block)).content
-    {
-      ...doc,
-      selection: caret(
-        start.block,
-        start.offset,
-        Runs.states(content, start.offset)->Array.getUnsafe(0),
-      ),
-    }
-  | Some({focus: {block, offset}, pending}) =>
+    placeAt(doc, start)
+  | Some({focus: {block, offset}}) =>
     let index = indexOf(doc, block)
     let content = blockAt(doc, index).content
-    let states = Runs.states(content, offset)
-    let at = stateIndex(states, pending)->Option.getOr(0)
-    if at > 0 {
-      {...doc, selection: caret(block, offset, states->Array.getUnsafe(at - 1))}
-    } else if offset > 0 {
-      let offset = Runs.back(content.text, offset)
-      {...doc, selection: caret(block, offset, last(Runs.states(content, offset)))}
+    if offset > 0 {
+      placeAt(doc, {block, offset: Runs.back(content.text, offset)})
     } else {
       switch index > 0 ? Some(blockAt(doc, index - 1)) : None {
       | Some(previous) =>
-        let end = previous.content.text->String.length
-        {...doc, selection: caret(previous.id, end, last(Runs.states(previous.content, end)))}
+        placeAt(doc, {block: previous.id, offset: previous.content.text->String.length})
       | None => doc
       }
     }

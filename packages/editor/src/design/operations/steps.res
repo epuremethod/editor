@@ -43,6 +43,16 @@ let act = (doc: Doc.t, said: string) => {
   switch (name, argument) {
   | ("backspace", None) => Edit.deleteBackward(doc)
   | ("delete", None) => Edit.deleteForward(doc)
+  | ("click", Some(block)) =>
+    let {doc: placed} = Notation.read(block, ~plain=true)
+    switch (doc.selection, placed.selection) {
+    | (Some({focus: {block: id}}), Some({focus: {offset}})) =>
+      Edit.select(doc, ~anchor={block: id, offset}, ~focus={block: id, offset})
+    | (None, Some({focus: {offset}})) =>
+      let id = (doc.blocks->Array.getUnsafe(0)).id
+      Edit.select(doc, ~anchor={block: id, offset}, ~focus={block: id, offset})
+    | _ => panic("click takes the block's plain text with the caret where the click lands")
+    }
   | ("enter", None) => Edit.split(doc, ~id=mint(doc))
   | ("moveUp", None) => Edit.moveUp(doc)
   | ("moveDown", None) => Edit.moveDown(doc)

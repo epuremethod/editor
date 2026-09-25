@@ -219,17 +219,30 @@ contentEditable element that holds exactly the plain text of the block and
 nothing else: no marker characters and no zero-width spaces. That keeps the
 offset map one to one. The browser never mutates the DOM on its own.
 
-Every input arrives as a `beforeinput` event and is intercepted, whatever its
-type: typed text, a deletion backward or forward, a deleted word, a mark
-toggle, a paragraph or line break, a paste, a replacement from autocorrect.
-The edit is applied to the model, the event is prevented, the block is
-re-rendered, and the selection is restored from model offsets. IME
-composition is the one exception. The browser composes, and the text is read
-back on `compositionend` and applied as one insert. The Operations page calls
-this act `input`: the block as the browser left it, whole, with its caret. The
-model diffs the old text against the new one to find the span that changed,
-so marks move with it, and typing, composition, dead keys and autocorrect all
-land on the same edit.
+Every input announces itself as a `beforeinput` event with a type, and the
+type decides who edits. A structural type is prevented and applied to the
+model as an act: a paragraph break is `enter`, a backspace at the start of a
+block or over a selection across blocks is `backspace`, a delete at the end
+is `delete`, a paste is `paste`, and a mark toggle is `bold` or `italic`. A
+text-level type reaches the DOM, and the model reads the block back on the
+`input` event that follows: a typed letter, a replacement from autocorrect,
+a dead key, a deletion inside a block, a deleted word. The Operations page
+calls that act `input`: the block as the browser left it, whole, with its
+caret. The model diffs the old text against the new one to find the span
+that changed, so marks move with it, and typing, composition, dead keys and
+autocorrect all land on the same edit. IME composition only waits: the
+browser composes, and the block is read back on `compositionend`.
+
+The block the browser touched is then rebuilt from the model rather than
+patched. React reconciles against what it rendered last, not against what
+the browser did, so a patch after a native edit doubles a character at a
+mark boundary. A block whose content changed takes a new key, its DOM is
+built again from runs, and the selection is restored from model offsets.
+
+One more rule keeps the two in step. A key can arrive before the
+`selectionchange` that follows the previous one, so every handler first
+brings the model's selection level with the DOM's, and only then decides
+whether a backspace is a join or a deletion.
 
 Every edit is a pure function on the model. Insert text, delete a range,
 toggle a mark, set a link, split a block, join two blocks, move a block,
@@ -240,8 +253,13 @@ tested with no browser.
 
 A mark extends when the caret types at its end, if the mark is bold, italic
 or code. A link does not extend at its end, and no mark extends at its start.
-Cmd+B on a caret stores a pending mark that applies to the next typed
-character. An empty run never exists in the model, which is why the DOM never
+Punctuation is the exception: a period or a comma typed at the end of a run
+lands outside it, since it closes the phrase the run was. A space at the end
+of a code span does the same, since a span is one identifier. The keys are
+Cmd+B, Cmd+I and Cmd+E; there are no markdown input rules, since a typed
+marker is a character on some keyboards and a dead key on others. Cmd+B on a caret
+stores a pending mark that applies to the next typed character, and takes
+the other side wherever the caret sits. An empty run never exists in the model, which is why the DOM never
 needs a zero-width space to hold one.
 
 Marks do not apply inside a code span. Toggling a mark over a range that
@@ -305,9 +323,15 @@ brackets in their text, nested and overlapping marks, empty lines. Property
 tests apply random sequences of edits and check that every mark stays inside
 its text, that offsets stay ordered, and that a split followed by a join gives
 back the original. Cross-block operations run against a fake list of blocks
-before any row exists. The browser layer gets a few end-to-end tests on
-`beforeinput`, composition and cross-block selection, in Chrome, Safari and
-Firefox.
+before any row exists.
+
+The browser runs the same fixtures. The binding's suite loads each
+scenario's document into the dev page through a hook, turns each act into
+keys, and reads the document back in the notation. An `input` act becomes
+the span that changed, selected and typed over. What no key can drive, a
+paste or a link, is skipped and says so. So a rule holds in the model and in
+Chrome by the same card, and the two cannot drift apart. Safari and Firefox
+are still to come.
 
 The hard parts stay hard. Escapes and code spans in the serializer and parser:
 a literal asterisk, a bracket inside link text, a mark that must stop at a

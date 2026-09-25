@@ -110,3 +110,52 @@ examples:
     after: |
       Any union of {**open sets is open.**
       **Any finite intersection**} of open sets is open.
+
+  - scenario: a period typed at the end of a bold run lands outside it
+    before: |
+      Every metric space is **Hausdorff|**
+    when: input(Every metric space is Hausdorff.|)
+    after: |
+      Every metric space is **Hausdorff**.|
+
+  - scenario: a comma typed at the end of a code span lands outside it
+    before: |
+      The open set is `U|` and its complement is closed.
+    when: input(The open set is U,| and its complement is closed.)
+    after: |
+      The open set is `U`,| and its complement is closed.
+
+  - scenario: a period typed inside a code span stays inside
+    before: |
+      The composite `f|g` is continuous.
+    when: input(The composite f.|g is continuous.)
+    after: |
+      The composite `f.|g` is continuous.
+
+  - scenario: a space typed at the end of a bold run keeps bold pending
+    before: |
+      An **open|** of X is a family of open sets.
+    when: [input(An open | of X is a family of open sets.), input(An open cover| of X is a family of open sets.)]
+    after: |
+      An **open cover|** of X is a family of open sets.
+
+  - scenario: code on a caret holds until the next typed character
+    before: |
+      Let | be open in X.
+    when: [code, input(Let U| be open in X.)]
+    after: |
+      Let `U|` be open in X.
+
+  - scenario: a space typed at the end of a code span lands outside it
+    before: |
+      The open set `U|`is a ball.
+    when: input(The open set U |is a ball.)
+    after: |
+      The open set `U` |is a ball.
+
+  - scenario: a space typed inside a code span stays inside
+    before: |
+      The composite `f|g` is continuous.
+    when: input(The composite f |g is continuous.)
+    after: |
+      The composite `f |g` is continuous.
