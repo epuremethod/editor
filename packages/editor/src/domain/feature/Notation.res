@@ -27,8 +27,9 @@ let readLine = (raw, ~plain) => {
     (Some(name), raw->String.slice(~start=whole->String.length))
   | None => (None, raw)
   }
-  let {text, markers} = Inline.read(plain ? quote(rest) : rest)
-  (label, text, markers)
+  let (form, line) = plain ? (Doc.Paragraph, rest) : Form.read(rest)
+  let {text, markers} = Inline.read(plain ? quote(line) : line)
+  (label, form, text, markers)
 }
 
 // Reads a document. A plain source holds no marks: its delimiters are text,
@@ -44,7 +45,7 @@ let read = (source: string, ~plain=false): read => {
     ->String.split("\n")
     ->Array.mapWithIndex((raw, index) => {
       let line = index + 1
-      let (label, content, markers) = readLine(raw, ~plain)
+      let (label, form, content, markers) = readLine(raw, ~plain)
       let id = switch label {
       | Some(name) =>
         labeled := true
@@ -75,7 +76,7 @@ let read = (source: string, ~plain=false): read => {
           focus := Some({Doc.block: id, offset})
         }
       )
-      {Doc.id, content}
+      {Doc.id, form, content}
     })
   let selection = switch (anchor.contents, focus.contents) {
   | (Some(anchor), Some(focus)) => Some({Doc.anchor, focus, pending: pending.contents})
@@ -119,7 +120,7 @@ let points = (doc: Doc.t, block: Doc.block): array<Inline.point> =>
 let write = (doc: Doc.t, ~labels=false): string =>
   doc.blocks
   ->Array.map(block => {
-    let text = Inline.write(block.content, ~points=points(doc, block))
+    let text = Form.write(block.form, Inline.write(block.content, ~points=points(doc, block)))
     let text = text->String.startsWith("@") ? "\\" ++ text : text
     labels ? `@${block.id} ${text}` : text
   })

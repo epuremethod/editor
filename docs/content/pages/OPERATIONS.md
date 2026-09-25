@@ -23,8 +23,10 @@ Hello world
   identity. When the `after` of a scenario names none, ids are not compared.
 - A backslash keeps the character after it literal: `\|`, `\{`, `\}`, `\\`
   and `\@`.
-- An empty line is an empty block. A line that starts with `# ` is a heading
-  block, and the hashes are not part of its text.
+- An empty line is an empty block. A line that starts with `# `, `## ` or
+  `### ` is a heading block, and one that starts with `- ` is an item of a
+  list. The prefix is the block's form, not part of its text. A line that
+  must begin with such a prefix as text takes a backslash.
 - Marks are inline markdown in one canonical form: `**bold**`, `_italic_`,
   `` `code` `` and `[text](href)`. A set of marks nests in one order, link
   outside, then bold, then italic, then code. Bold and italic never open or
@@ -34,8 +36,9 @@ Hello world
   types the next letter bold and `**open**|` does not. Empty markers around
   the caret, `**|**`, hold a pending mark in plain text.
 - The act is a word, with its argument in parentheses: `backspace`,
-  `delete`, `enter`, `bold`, `italic`, `code`, `link(/open-sets)`, `moveUp`,
-  `moveDown`, `paste(...)` and `input(For every ε| there is a δ.)`. Several
+  `delete`, `enter`, `bold`, `italic`, `code`, `link(/open-sets)`,
+  `heading(2)`, `paragraph`, `item`, `moveUp`, `moveDown`, `paste(...)` and
+  `input(For every ε| there is a δ.)`. Several
   acts make a list: `[enter, enter]`. The two arrows, `->` and `<-`, are acts
   too. The argument of `input` is plain text: the browser knows no marks, so
   none are read in it. The argument of `paste` is a document in the notation,
@@ -50,11 +53,11 @@ A scenario is the document before, the act, and the document after:
 ```yaml
 - scenario: backspace at the start of a paragraph joins it with the previous one
   before: |
-    Hello world
+    Hello world.
     |Second one
   when: backspace
   after: |
-    Hello world|Second one
+    Hello world. |Second one
 ```
 
 ## Join
@@ -134,3 +137,22 @@ blocks. The caret lands at the end of what was pasted. Over a selection, the
 selection goes first.
 
 {{pasteOps}}
+
+## Heading
+
+A block has a form: prose, a heading with its level, or an item of a list.
+The form is the line's prefix on the port and in the notation, and it is not
+text in the model. Setting a form a block already has turns it back into
+prose, so one key toggles. On a split the form follows the text: the half
+that holds the title stays a heading, and an empty half is prose. Backspace
+at the start of a heading turns it into prose and does not join; the next
+backspace joins.
+
+{{headingOps}}
+
+## Item
+
+An item splits into two items, so a list goes on. Enter on an empty item
+leaves the list, and backspace at the start of an item turns it into prose.
+
+{{itemOps}}

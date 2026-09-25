@@ -47,6 +47,19 @@ examples:
     canonical:
       - "**Open**  sets are closed under unions."
 
+  - scenario: a heading and an item keep their prefixes
+    blocks:
+      - "# Open sets"
+      - "## Examples"
+      - "- Every open ball is open."
+      - "A **topology** is a collection of open sets."
+
+  - scenario: a line that would read as a prefix keeps its backslash
+    blocks:
+      - "\\# not a heading"
+      - "\\- not an item"
+      - "#hashtags and -dashes need none"
+
   - scenario: an edit hands the section back whole, with its ids and no caret
     given: an editor over a section
     before: |

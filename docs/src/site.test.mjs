@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import {readFileSync} from "node:fs"
+import {existsSync, readFileSync} from "node:fs"
 import test from "node:test"
 
 const dist = new URL("../dist/", import.meta.url)
@@ -28,4 +28,13 @@ test("the editor page draws its schemas and flows", () => {
   assert.match(html, /<span class="schema__embed">/)
   assert.match(html, /<figure class="flow">/)
   assert.match(html, /<ol class="contents__sections">/)
+})
+
+test("the demo page is built with the shell and loads the demo", () => {
+  const html = page("demo.html")
+  assert.match(html, /<aside class="contents"/)
+  assert.match(html, /<article class="prose"/)
+  assert.match(html, /id="demo-editor"/)
+  assert.match(html, /<script type="module" src="\.\/demo\.js"><\/script>/)
+  assert.ok(existsSync(new URL("demo.js", dist)))
 })

@@ -12,6 +12,7 @@
     "res:dev": "rescript watch",
     "format": "rescript format",
     "build": "rescript && vite build",
+    "build:demo": "rescript && vite build --config vite.demo.config.mjs",
     "preview": "vite preview",
     "pretest": "rescript",
     "test": "playwright test"

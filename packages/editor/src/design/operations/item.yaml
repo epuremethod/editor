@@ -1,0 +1,59 @@
+feature: Item
+background:
+  given: an editor
+examples:
+  - scenario: item turns the block holding the caret into an item
+    before: |
+      Every open ball is open.|
+    when: item
+    after: |
+      - Every open ball is open.|
+
+  - scenario: item on an item turns it back into prose
+    before: |
+      - Every open ball is open.|
+    when: item
+    after: |
+      Every open ball is open.|
+
+  - scenario: enter at the end of an item opens a new item
+    before: |
+      - Every open ball is open.|
+    when: enter
+    after: |
+      - Every open ball is open.
+      - |
+
+  - scenario: enter on an empty item leaves the list
+    before: |
+      - Every open ball is open.
+      - |
+    when: enter
+    after: |
+      - Every open ball is open.
+      |
+
+  - scenario: enter in the middle of an item splits it into two items
+    before: |
+      - Every open ball| is open.
+    when: enter
+    after: |
+      - Every open ball
+      - |is open.
+
+  - scenario: backspace at the start of an item turns it into prose
+    before: |
+      - Every open ball is open.
+      - |The whole space is open.
+    when: backspace
+    after: |
+      - Every open ball is open.
+      |The whole space is open.
+
+  - scenario: backspace at the start of the prose after an item joins it into the item
+    before: |
+      - Every open ball is open.
+      |The whole space is open.
+    when: backspace
+    after: |
+      - Every open ball is open. |The whole space is open.

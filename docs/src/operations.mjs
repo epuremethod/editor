@@ -89,11 +89,19 @@ function text(doc, block) {
   return html
 }
 
+// A block's form, drawn as the prefix the notation writes for it.
+function lead(block) {
+  const form = block.form
+  if (form === "Item") return '<span class="tree__form">- </span>'
+  if (typeof form === "object") return `<span class="tree__form">${"#".repeat(form._0)} </span>`
+  return ""
+}
+
 function tree(doc) {
   const blocks = doc.blocks
     .map(
       block =>
-        `<li class="tree__block"><span class="tree__id">${escape(block.id)}</span><span class="tree__text">${text(doc, block) || '<span class="tree__empty">—</span>'}</span></li>`,
+        `<li class="tree__block"><span class="tree__id">${escape(block.id)}</span><span class="tree__text${typeof block.form === "object" ? " tree__text--heading" : ""}">${lead(block)}${text(doc, block) || '<span class="tree__empty">—</span>'}</span></li>`,
     )
     .join("")
   return `<ol class="tree">${blocks}</ol>`
@@ -138,6 +146,9 @@ const keys = {
   moveDown: "⇧↓",
   paste: "⌘V",
   click: "⌖",
+  heading: "H",
+  paragraph: "P",
+  item: "•",
 }
 
 function sign(name) {

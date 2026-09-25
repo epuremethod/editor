@@ -461,6 +461,10 @@ body {
 
 .tree__empty { color: var(--grey-light); }
 
+.tree__form { font-family: var(--mono); font-size: 0.85em; color: var(--red); }
+
+.tree__text--heading { font-weight: 700; }
+
 .tree__caret {
   display: inline-block;
   width: 3px;
@@ -632,6 +636,22 @@ body {
 .flow__name { font-size: 1.05em; font-weight: 500; }
 
 .flow__note { font-size: 0.9em; color: var(--grey); line-height: 1.35; }
+
+/* The demo: the page is the editor. Its title, headings, prose and list
+   are the prose's own styles, and its caret is red. The port's text sits
+   under it in a grey plate. */
+
+.prose .editor {
+  margin: 0 0 2.4rem;
+  outline: none;
+  caret-color: var(--red);
+}
+
+.prose .editor p { margin: 0 0 1.1rem; min-height: 1.5em; }
+
+.prose .editor h1, .prose .editor h2, .prose .editor h3, .prose .editor li { min-height: 1em; }
+
+.prose #demo-port { min-height: 3rem; }
 
 @media (max-width: 58rem) {
   .contents {

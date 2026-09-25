@@ -12,4 +12,5 @@ docs/dist/
 
 # The binding's Vite bundle.
 packages/tilia/dist/
+packages/tilia/dist-demo/
 packages/tilia/test-results/

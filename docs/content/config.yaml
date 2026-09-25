@@ -7,14 +7,17 @@ var:
     fill='%23000'%3Ee%3C/text%3E%3C/svg%3E
   indexCurrent: ""
   operationsCurrent: ""
+  demoCurrent: ""
   indexToc: ""
   operationsToc: ""
+  demoToc: ""
   contents: |-
     <aside class="contents" aria-label="Contents">
       <a class="brand" href="./index.html">Editor</a>
       <p class="contents__label">Contents</p>
       <ol class="contents__pages">
         <li><a href="./index.html"{{indexCurrent}}>The editor</a>{{indexToc}}</li>
+        <li><a href="./demo.html"{{demoCurrent}}>Demo</a>{{demoToc}}</li>
         <li><a href="./operations.html"{{operationsCurrent}}>Operations</a>{{operationsToc}}</li>
       </ol>
       <p class="contents__colophon">editor / 1926</p>
@@ -51,6 +54,14 @@ build:
       pageBody: { file: pages/EDITOR.md, transform: docsMd }
       indexToc: { file: pages/EDITOR.md, transform: docsToc }
       indexCurrent: ' aria-current="page"'
+  - output: "{{output}}/demo.html"
+    input: "{{shell}}"
+    var:
+      title: Demo — Editor
+      running: Demo
+      pageBody: { file: pages/DEMO.md, transform: docsMd }
+      demoToc: { file: pages/DEMO.md, transform: docsToc }
+      demoCurrent: ' aria-current="page"'
   - output: "{{output}}/operations.html"
     input: "{{shell}}"
     var:
@@ -96,8 +107,20 @@ build:
           file: ../../packages/editor/src/design/operations/paste.yaml,
           transform: operations
         }
+      headingOps:
+        {
+          file: ../../packages/editor/src/design/operations/heading.yaml,
+          transform: operations
+        }
+      itemOps:
+        {
+          file: ../../packages/editor/src/design/operations/item.yaml,
+          transform: operations
+        }
       pageBody: { file: pages/OPERATIONS.md, transform: docsMd }
       operationsToc: { file: pages/OPERATIONS.md, transform: docsToc }
       operationsCurrent: ' aria-current="page"'
   - output: "{{output}}/style.css"
     input: { copy: ../assets/style.css }
+  - output: "{{output}}/demo.js"
+    input: { copy: ../../packages/tilia/dist-demo/demo.js }

@@ -4,7 +4,8 @@ The editor is a view over rows. A chapter of the course is a row, each of its
 sections is a row, and a section holds its blocks in one field. Nothing is a
 text blob. This page settles the words, what lives in the store, how two
 copies of a section merge, and how the browser is kept out of the model. The
-Operations page holds the contract, one card per edit.
+Operations page holds the contract, one card per edit. The section "Where it
+stands", near the end, says which of this exists and which is still a plan.
 
 Three packages share the work, and the dependency runs one way.
 `@epure/editor` is the core: the types, the pure model, the notation,
@@ -31,12 +32,14 @@ nesting. Its heading, when it has one, is a block inside it.
 
 A **block** is one entry of that field: an id and a content. It is the
 smallest thing the editor renders, and the thing the Operations page draws one
-line for. A block has a kind. A **paragraph** holds prose. A **heading** holds
-a title. A **formula** holds a LaTeX display. An **embed** holds no text. It
-names a row that hangs under the section, and that row draws itself. A video
-block is an embed whose row is a Video, and a quiz block is an embed whose row
-is a Quiz. Paragraph is the everyday word for the common block. The model says
-block.
+line for. A block has a form. A **paragraph** holds prose. A **heading** holds
+a title at one of three levels. An **item** is one entry of a list. A
+**formula** holds a LaTeX display. An **embed** holds no text. It names a row
+that hangs under the section, and that row draws itself. A video block is an
+embed whose row is a Video, and a quiz block is an embed whose row is a Quiz.
+Paragraph is the everyday word for the common block. The model says block.
+The form is the line's prefix on the port, `# ` or `- `, and is not text in
+the model: offsets count from the first letter.
 
 The content of a text block is **runs**: plain text and a list of **marks**. A
 mark is a kind, such as bold, italic, code or link, over a span of the plain
@@ -214,10 +217,13 @@ produces no merge noise once it has been through unpack and pack once.
 
 ## The input layer
 
-The browser is an input device, not the model. Each block renders into a
-contentEditable element that holds exactly the plain text of the block and
-nothing else: no marker characters and no zero-width spaces. That keeps the
-offset map one to one. The browser never mutates the DOM on its own.
+The browser is an input device, not the model. A section renders into one
+contentEditable root, one paragraph per block, keyed by the block's id. A
+paragraph holds exactly the plain text of its block, wrapped in the tags its
+marks call for and nothing else: no marker characters and no zero-width
+spaces. That keeps the offset map one to one. The browser edits text inside
+a paragraph and is allowed nothing beyond that; every change of structure is
+the model's.
 
 Every input announces itself as a `beforeinput` event with a type, and the
 type decides who edits. A structural type is prevented and applied to the
@@ -244,23 +250,30 @@ One more rule keeps the two in step. A key can arrive before the
 brings the model's selection level with the DOM's, and only then decides
 whether a backspace is a join or a deletion.
 
-Every edit is a pure function on the model. Insert text, delete a range,
-toggle a mark, set a link, split a block, join two blocks, move a block,
-delete across blocks. No function touches the DOM, and every one of them is
-tested with no browser.
+Every edit is a pure function on the model: input, delete backward and
+forward, split, join, toggle a mark, set a link, move a block, paste, place
+the caret, step it. No function touches the DOM, and every one of them is
+tested with no browser before it is tested with one.
 
 ## Marks
 
-A mark extends when the caret types at its end, if the mark is bold, italic
-or code. A link does not extend at its end, and no mark extends at its start.
-Punctuation is the exception: a period or a comma typed at the end of a run
-lands outside it, since it closes the phrase the run was. A space at the end
-of a code span does the same, since a span is one identifier. The keys are
-Cmd+B, Cmd+I and Cmd+E; there are no markdown input rules, since a typed
-marker is a character on some keyboards and a dead key on others. Cmd+B on a caret
-stores a pending mark that applies to the next typed character, and takes
-the other side wherever the caret sits. An empty run never exists in the model, which is why the DOM never
-needs a zero-width space to hold one.
+A caret holds pending marks: the marks the next typed character takes. It
+takes them from its place, whether an arrow or a click put it there: inside a
+bold, italic or code run at its end, outside a link at its end, outside any
+run at its start. So a mark extends when the caret types at its end, unless
+it is a link, and never extends at its start. Punctuation is the exception:
+a period or a comma typed at the end of a run lands outside it, since it
+closes the phrase the run was. A space at the end of a code span does the
+same, since a span is one identifier. After typing, the pending marks are
+those the last typed character took; after a deletion they follow the
+character before the caret.
+
+The keys are Cmd+B, Cmd+I and Cmd+E. On a selection they toggle the mark
+over it, skipping code spans; on a caret they change the pending marks, and
+so take the other side wherever the caret sits. There are no markdown input
+rules, since a typed marker is a character on some keyboards and a dead key
+on others. An empty run never exists in the model, which is why the DOM
+never needs a zero-width space to hold one.
 
 Marks do not apply inside a code span. Toggling a mark over a range that
 contains a code span skips the span. Overlapping marks are fine in the model.
@@ -277,31 +290,32 @@ is content.
 
 ## Across blocks
 
-One `selectionchange` listener on the document is enough. Each block root
-carries its id in a data attribute, and the listener resolves the anchor and
-focus nodes of the selection to their blocks and offsets. Each block is then
-in one of three states: not selected, partially selected between two offsets,
-or fully selected. The listener computes the new state of every block and
-updates only the blocks whose state changed.
+One `selectionchange` listener on the document is enough. Each paragraph
+carries its block's id, and the listener resolves the anchor and focus nodes
+of the selection to their blocks and offsets, then places the model's
+selection there. Because the section is one editable root, a selection
+across blocks is the browser's own and needs no drawing.
 
-Arrow up on the first line of a block moves to the previous block at the same
-horizontal position. Arrow down on the last line moves to the next. A delete
-over a selection that spans blocks trims the first block, trims the last,
-deletes the blocks between and joins the two ends.
+A delete over a selection that spans blocks trims the first block, trims the
+last, deletes the blocks between and joins the two ends. A letter typed over
+such a selection does the same and then lands in the joined block. Arrow left
+and right are the model's, one character at a time, and cross to the next or
+the previous block at the edges. Arrow up and down are the browser's, since
+they depend on line layout, and the model only places the caret where they
+put it.
 
-A selection that leaves a single block enters block-selection mode. Browsers
-handle a selection across separate editable elements badly, so in that mode
-the editor draws the selection itself.
+Block-selection mode, where a selection that leaves a single block turns
+into a selection of whole blocks, is planned and not built.
 
 ## Copy and paste
 
-Copy writes the selection twice: as markdown in `text/plain` and as rendered
-marks in `text/html`. Paste reads `text/html` first and falls back to
-`text/plain`. Both parse into blocks and runs. A paste that yields one block
-inserts text and marks at the caret. A paste that yields several blocks
-splits the current block: the first pasted block joins the text before the
-caret, the last joins the text after, and the rest sit between as new
-blocks.
+Paste reads `text/plain` as markdown, one block per line, and parses it into
+blocks and runs. A paste that yields one block inserts text and marks at the
+caret. A paste that yields several blocks splits the current block: the first
+pasted block joins the text before the caret, the last joins the text after,
+both the way a join does, and the rest sit between as new blocks. Reading
+`text/html` first, and copy, which will write the selection as markdown in
+`text/plain` and as rendered marks in `text/html`, are still to come.
 
 A paste inside the same section is a change to one keyed array. A paste into
 another document must clone the rows its embeds name under the new section,
@@ -311,19 +325,24 @@ a few rows for its videos in one batch, and the batch must be comfortable.
 
 ## Undo
 
-Undo is an editor stack of model edits, one per session. Browser undo breaks
-across re-renders and across rows. Each entry stores the inverse edit and the
-selection before it, so undo restores both the text and the caret.
+Undo is not built yet. It will be an editor stack of model edits, one per
+session, because browser undo breaks across re-renders and across rows. Each
+entry will store the inverse edit and the selection before it, so undo
+restores both the text and the caret. Today the browser's undo is prevented
+and does nothing.
 
 ## Testing
 
-The model is pure and is tested with no browser. A corpus of markdown round
-trips to runs and back without change: escapes, code spans, links with
-brackets in their text, nested and overlapping marks, empty lines. Property
-tests apply random sequences of edits and check that every mark stays inside
-its text, that offsets stay ordered, and that a split followed by a join gives
-back the original. Cross-block operations run against a fake list of blocks
-before any row exists.
+The model is pure and is tested with no browser. Seventy cards on the
+Operations page are the edits, and ten more scenarios in the Storage group
+are the port: a corpus of markdown that round trips to runs and back without
+change, with escapes, code spans, delimiters inside them, links with brackets
+in their text, nested marks, empty lines and the two canonicalizations, and
+two acts whose `update` is checked whole. Property tests, which would apply
+random sequences of edits and check that every mark stays inside its text,
+that offsets stay ordered, and that a split followed by a join gives back the
+original, are still to write. Cross-block operations run against a plain list
+of blocks before any row exists.
 
 The browser runs the same fixtures. The binding's suite loads each
 scenario's document into the dev page through a hook, turns each act into
@@ -375,6 +394,39 @@ own block. The previous answer was to split into blocks past ten items.
 The evaluator trigger on a relation change, sibling of the trigger on an
 `under` edge, is a cost to schedule on the lapa side.
 
+## Where it stands
+
+`@epure/editor` exists and is the model described here: the types, runs,
+the inline markdown reader and writer, the notation, every edit on the
+Operations page, and the port with its two crossings. A hundred scenarios
+pass with no browser. Blocks have three forms, prose, heading and item; a
+formula or an embed still reads as literal text on the port.
+
+`@tilia/editor` exists as an experiment in this workspace, to move to tilia's
+own once its shape has settled. It renders one section, headings and lists
+included, splits input by type between the browser and the model, rebuilds
+the block the browser touched, keeps the model's selection level with the
+DOM's, and hands the changed section to the port after every act. The Demo
+page of this site is that editor over the page itself, with what the port
+received under it. Eighty-two of the cards run in Chrome through the same
+fixtures; six are skipped because no key drives them. Composition is wired
+and untested, and Safari and Firefox are untouched.
+
+`@lapa/editor` does not exist. Nothing on the rows and reach pages is built,
+and the keyed array's sequence merge is still to write in `@lapa/db`.
+
+| Stage | State |
+| --- | --- |
+| Inline model, edits, round-trip corpus | done; property tests to write |
+| Block list: split, join, move, delete across, paste | done |
+| One section in React: input, rebuild, selection | done in Chrome |
+| Across blocks: selection, delete, typed text | done; block-selection mode planned |
+| Copy and paste | paste from plain text; copy and HTML to come |
+| Undo | not started |
+| Block forms: headings and items | done |
+| Formulas and embeds | not started |
+| Lapa: the sequence merge, rows through the port | not started |
+
 ## Order of work
 
 The order follows the difficulty. Row work is easy: positions, the `parents`
@@ -389,9 +441,10 @@ links, bold, italic and the rest is not trivial.
 ```flow The stages, in order
 inline model | edits, the round-trip corpus and the property tests
 block list | split, join, move, delete across, the paste result
-one block in React | beforeinput, composition, selection restore
+one section in React | beforeinput, composition, selection restore
 across blocks | cross-block selection and block-selection mode
 copy and paste | both clipboard formats, the paste batch
 undo | the stack of inverse edits
+block forms | headings and items, then formulas and embeds through an injected component
 lapa | the keyed array, its sequence merge, rows bound through the port
 ```

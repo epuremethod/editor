@@ -22,7 +22,12 @@ const keys = {
   code: "ControlOrMeta+e",
   moveUp: "ControlOrMeta+Shift+ArrowUp",
   moveDown: "ControlOrMeta+Shift+ArrowDown",
+  paragraph: "ControlOrMeta+Alt+Digit0",
+  item: "ControlOrMeta+Shift+Digit8",
 }
+
+// `heading(n)` is Cmd+Alt and the digit of its level.
+const keyFor = ({name, argument}) => (name === "heading" ? `ControlOrMeta+Alt+Digit${argument}` : keys[name])
 
 const acts = when => (Array.isArray(when) ? when : [when]).map(said => {
   const found = actLine.exec(String(said).trim())
@@ -89,7 +94,7 @@ async function click(page, argument) {
   await page.evaluate(select, {id, from: offset, to: offset})
 }
 
-const drivable = when => acts(when).every(({name}) => keys[name] || name === "input" || name === "click")
+const drivable = when => acts(when).every(act => keyFor(act) || act.name === "input" || act.name === "click")
 
 for (const file of readdirSync(dir).filter(name => name.endsWith(".yaml"))) {
   const fixture = parse(readFileSync(new URL(file, dir), "utf8"))
@@ -102,10 +107,11 @@ for (const file of readdirSync(dir).filter(name => name.endsWith(".yaml"))) {
         await page.locator(".editor").focus()
         await page.evaluate(source => window.editor.load(source), example.before)
         await settle(page)
-        for (const {name, argument} of acts(example.when)) {
+        for (const act of acts(example.when)) {
+          const {name, argument} = act
           if (name === "input") await typeInput(page, argument)
           else if (name === "click") await click(page, argument)
-          else await page.keyboard.press(keys[name])
+          else await page.keyboard.press(keyFor(act))
           await settle(page)
         }
         const after = read(example.after)

@@ -58,7 +58,8 @@ let deleteRange = (doc: Doc.t, selection: Doc.selection): Doc.t => {
       selection: caret(start.block, start.offset, Runs.before(content, start.offset)),
     }
   } else {
-    let first = blockAt(doc, from).content
+    let head = blockAt(doc, from)
+    let first = head.content
     let last = blockAt(doc, to).content
     let content = Runs.concat(
       Runs.slice(first, ~from=0, ~to=start.offset),
@@ -67,7 +68,7 @@ let deleteRange = (doc: Doc.t, selection: Doc.selection): Doc.t => {
     let blocks =
       doc.blocks
       ->Array.slice(~start=0, ~end=from)
-      ->Array.concat([{Doc.id: start.block, content}])
+      ->Array.concat([{Doc.id: start.block, form: head.form, content}])
       ->Array.concat(doc.blocks->Array.slice(~start=to + 1, ~end=doc.blocks->Array.length))
     {blocks, selection: caret(start.block, start.offset, Runs.before(content, start.offset))}
   }
@@ -113,7 +114,7 @@ let join = (doc: Doc.t, index, ~side): Doc.t => {
   let blocks =
     doc.blocks
     ->Array.slice(~start=0, ~end=index - 1)
-    ->Array.concat([{Doc.id: previous.id, content}])
+    ->Array.concat([{Doc.id: previous.id, form: previous.form, content}])
     ->Array.concat(doc.blocks->Array.slice(~start=index + 1, ~end=doc.blocks->Array.length))
   {blocks, selection: caret(previous.id, offset, Runs.before(content, offset))}
 }
@@ -127,7 +128,13 @@ let deleteBackward = (doc: Doc.t): Doc.t =>
   | Some(selection) if !collapsed(selection) => deleteRange(doc, selection)
   | Some({focus: {block, offset}}) =>
     let index = indexOf(doc, block)
-    if offset == 0 {
+    let here = blockAt(doc, index)
+    if offset == 0 && here.form != Paragraph {
+      // A heading or an item turns back into prose before it joins.
+      let blocks = doc.blocks->Array.copy
+      blocks->Array.set(index, {...here, form: Paragraph})
+      {...doc, blocks}
+    } else if offset == 0 {
       index == 0 ? doc : join(doc, index, ~side=Second)
     } else {
       let content = blockAt(doc, index).content
@@ -175,28 +182,54 @@ let leadingBlank = (text: string, offset) => {
   start.contents
 }
 
+// The forms of the two halves of a split. Prose splits into prose. A
+// heading follows its text: the half that holds it stays a heading, and an
+// empty half is prose. An item splits into two items, so a list goes on.
+let halves = (form: Doc.form, ~firstEmpty, ~secondEmpty): (Doc.form, Doc.form) =>
+  switch form {
+  | Paragraph => (Paragraph, Paragraph)
+  | Item => (Item, Item)
+  | Heading(_) => firstEmpty && !secondEmpty ? (Paragraph, form) : (form, Paragraph)
+  }
+
 // Splits the block holding the caret. The first half keeps its id; the second
 // takes `id`, which the caller minted. The spaces at the seam go. Over a
-// range, the range goes first.
+// range, the range goes first. Enter on an empty item leaves the list: the
+// item turns into prose and nothing splits.
 let rec split = (doc: Doc.t, ~id: Doc.id): Doc.t =>
   switch doc.selection {
   | None => doc
   | Some(selection) if !collapsed(selection) => split(deleteRange(doc, selection), ~id)
   | Some({focus: {block, offset}}) =>
     let index = indexOf(doc, block)
-    let content = blockAt(doc, index).content
-    let first = Runs.slice(content, ~from=0, ~to=trailingBlank(content.text, offset))
-    let second = Runs.slice(
-      content,
-      ~from=leadingBlank(content.text, offset),
-      ~to=content.text->String.length,
-    )
-    let blocks =
-      doc.blocks
-      ->Array.slice(~start=0, ~end=index)
-      ->Array.concat([{Doc.id: block, content: first}, {id, content: second}])
-      ->Array.concat(doc.blocks->Array.slice(~start=index + 1, ~end=doc.blocks->Array.length))
-    {blocks, selection: caret(id, 0, [])}
+    let here = blockAt(doc, index)
+    let content = here.content
+    if here.form == Item && content.text == "" {
+      let blocks = doc.blocks->Array.copy
+      blocks->Array.set(index, {...here, form: Paragraph})
+      {...doc, blocks}
+    } else {
+      let first = Runs.slice(content, ~from=0, ~to=trailingBlank(content.text, offset))
+      let second = Runs.slice(
+        content,
+        ~from=leadingBlank(content.text, offset),
+        ~to=content.text->String.length,
+      )
+      let (firstForm, secondForm) = halves(
+        here.form,
+        ~firstEmpty=first.text == "",
+        ~secondEmpty=second.text == "",
+      )
+      let blocks =
+        doc.blocks
+        ->Array.slice(~start=0, ~end=index)
+        ->Array.concat([
+          {Doc.id: block, form: firstForm, content: first},
+          {id, form: secondForm, content: second},
+        ])
+        ->Array.concat(doc.blocks->Array.slice(~start=index + 1, ~end=doc.blocks->Array.length))
+      {blocks, selection: caret(id, 0, [])}
+    }
   }
 
 let commonPrefix = (a: string, b: string, ~max) => {
@@ -503,17 +536,37 @@ let rec paste = (doc: Doc.t, ~blocks: array<Doc.text>, ~ids: array<Doc.id>): Doc
       let between =
         blocks
         ->Array.slice(~start=1, ~end=count - 1)
-        ->Array.mapWithIndex((text, at) => {Doc.id: ids->Array.getUnsafe(at), content: text})
+        ->Array.mapWithIndex((text, at) => {
+          Doc.id: ids->Array.getUnsafe(at),
+          form: Paragraph,
+          content: text,
+        })
       let lastId = ids->Array.getUnsafe(count - 2)
       let blocks =
         doc.blocks
         ->Array.slice(~start=0, ~end=index)
-        ->Array.concat([{Doc.id: block, content: head}])
+        ->Array.concat([{Doc.id: block, form: blockAt(doc, index).form, content: head}])
         ->Array.concat(between)
-        ->Array.concat([{id: lastId, content: tail}])
+        ->Array.concat([{id: lastId, form: Paragraph, content: tail}])
         ->Array.concat(doc.blocks->Array.slice(~start=index + 1, ~end=doc.blocks->Array.length))
       let offset = last.text->String.length
       {blocks, selection: caret(lastId, offset, Runs.before(tail, offset))}
     | _ => doc
     }
+  }
+
+// Sets the form of every block the selection covers. Setting the form a
+// block already has turns it back into prose, so one key toggles.
+let form = (doc: Doc.t, ~form: Doc.form): Doc.t =>
+  switch doc.selection {
+  | None => doc
+  | Some(selection) =>
+    let (from, to) = reach(doc, selection)
+    let covered = doc.blocks->Array.slice(~start=from, ~end=to + 1)
+    let already = covered->Array.every(block => block.form == form)
+    let blocks =
+      doc.blocks->Array.mapWithIndex((block, index) =>
+        index < from || index > to ? block : {...block, form: already ? Paragraph : form}
+      )
+    {...doc, blocks}
   }

@@ -12,7 +12,12 @@ type mark = {kind: kind, start: int, stop: int}
 
 type text = {text: string, marks: array<mark>}
 
-type block = {id: id, content: text}
+// The form of a block: prose, a heading with its level, or an item of a
+// list. On the port the form is the line's prefix, `# ` or `- `; in the
+// model it is not text, so offsets count from the first letter.
+type form = Paragraph | Heading(int) | Item
+
+type block = {id: id, form: form, content: text}
 
 // A place in the document: a plain-text offset inside a block.
 type point = {block: id, offset: int}

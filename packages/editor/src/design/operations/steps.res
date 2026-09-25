@@ -43,6 +43,13 @@ let act = (doc: Doc.t, said: string) => {
   switch (name, argument) {
   | ("backspace", None) => Edit.deleteBackward(doc)
   | ("delete", None) => Edit.deleteForward(doc)
+  | ("heading", Some(level)) =>
+    switch Int.fromString(level) {
+    | Some(level) => Edit.form(doc, ~form=Heading(level))
+    | None => panic("heading takes its level: heading(2)")
+    }
+  | ("paragraph", None) => Edit.form(doc, ~form=Paragraph)
+  | ("item", None) => Edit.form(doc, ~form=Item)
   | ("click", Some(block)) =>
     let {doc: placed} = Notation.read(block, ~plain=true)
     switch (doc.selection, placed.selection) {

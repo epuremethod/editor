@@ -6,7 +6,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "prebuild": "pnpm --filter @epure/editor res:build",
+    "prebuild": "pnpm --filter @epure/editor res:build && pnpm --filter @tilia/editor build:demo",
     "build": "node src/build.mjs",
     "dev": "node src/dev.mjs",
     "check": "pnpm build && node --test src/*.test.mjs",

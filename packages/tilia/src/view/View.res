@@ -100,12 +100,16 @@ let wrap = (kind: Doc.kind, inner: React.element) =>
   | Link(href) => <a href> {inner} </a>
   }
 
+// One block, as the element its form calls for: a paragraph, a heading at
+// its level, or a list item. The id on the element is what the selection
+// resolves to.
 module Block = {
   @react.component
   let make = (~block: Doc.block) => {
     let pieces = Runs.segments(block.content)
-    <p id={"block-" ++ block.id}>
-      {pieces->Array.length == 0
+    let id = "block-" ++ block.id
+    let inner =
+      pieces->Array.length == 0
         ? <br />
         : pieces
           ->Array.mapWithIndex(((text, kinds), index) =>
@@ -115,9 +119,27 @@ module Block = {
               ->Array.reduce(React.string(text), (inner, kind) => wrap(kind, inner))}
             </React.Fragment>
           )
-          ->React.array}
-    </p>
+          ->React.array
+    switch block.form {
+    | Paragraph => <p id> {inner} </p>
+    | Heading(1) => <h1 id> {inner} </h1>
+    | Heading(2) => <h2 id> {inner} </h2>
+    | Heading(_) => <h3 id> {inner} </h3>
+    | Item => <li id> {inner} </li>
+    }
   }
+}
+
+// The blocks in order, consecutive items gathered into one list.
+let grouped = (blocks: array<Doc.block>): array<array<Doc.block>> => {
+  let out: array<array<Doc.block>> = []
+  blocks->Array.forEach(block => {
+    switch (block.form, out->Array.get(out->Array.length - 1)) {
+    | (Item, Some(group)) if (group->Array.getUnsafe(0)).form == Item => group->Array.push(block)
+    | _ => out->Array.push([block])
+    }
+  })
+  out
 }
 
 @react.component
@@ -137,7 +159,7 @@ let make = (
     let after = act(before)
     let changed = after.blocks->Array.filter(block =>
       switch Doc.block(before, block.id) {
-      | Some(old) => old.content != block.content
+      | Some(old) => old.content != block.content || old.form != block.form
       | None => true
       }
     )
@@ -278,6 +300,25 @@ let make = (
     | "ArrowDown" if command && event->ReactEvent.Keyboard.shiftKey =>
       event->ReactEvent.Keyboard.preventDefault
       apply(Edit.moveDown)
+    // The forms go by key code: with Alt held, a digit's key is a symbol.
+    | _ if command && event->ReactEvent.Keyboard.altKey =>
+      let form = switch event->ReactEvent.Keyboard.code {
+      | "Digit0" => Some(Doc.Paragraph)
+      | "Digit1" => Some(Heading(1))
+      | "Digit2" => Some(Heading(2))
+      | "Digit3" => Some(Heading(3))
+      | _ => None
+      }
+      form->Option.forEach(form => {
+        event->ReactEvent.Keyboard.preventDefault
+        apply(doc => Edit.form(doc, ~form))
+      })
+    | _
+      if command &&
+      event->ReactEvent.Keyboard.shiftKey &&
+      event->ReactEvent.Keyboard.code == "Digit8" =>
+      event->ReactEvent.Keyboard.preventDefault
+      apply(doc => Edit.form(doc, ~form=Item))
     | _ => ()
     }
   }
@@ -324,13 +365,12 @@ let make = (
       ->Nullable.toOption
       ->Option.map(active => active === root)
       ->Option.getOr(false) =>
+      // The block's element, wherever it sits under the root: an item is
+      // inside its list.
       let at = (point: Doc.point) =>
         root
-        ->Browser.children
-        ->Browser.listed
-        ->Array.find(block =>
-          block->Browser.attribute("id")->Nullable.toOption == Some("block-" ++ point.block)
-        )
+        ->Browser.query("#block-" ++ point.block)
+        ->Nullable.toOption
         ->Option.map(block => Browser.pointAt(block, point.offset))
       switch (at(anchor), at(focus)) {
       | (Some((a, ao)), Some((f, fo))) =>
@@ -360,13 +400,23 @@ let make = (
       readBack()
     }}
   >
-    {state.doc.blocks
-    ->Array.map(block =>
-      <Block
-        key={block.id ++ ":" ++ Int.toString(state.revisions->Dict.get(block.id)->Option.getOr(0))}
-        block
-      />
-    )
+    {grouped(state.doc.blocks)
+    ->Array.map(group => {
+      let drawn =
+        group
+        ->Array.map(block =>
+          <Block
+            key={block.id ++
+            ":" ++
+            Int.toString(state.revisions->Dict.get(block.id)->Option.getOr(0))}
+            block
+          />
+        )
+        ->React.array
+      (group->Array.getUnsafe(0)).form == Item
+        ? <ul key={"list-" ++ (group->Array.getUnsafe(0)).id}> {drawn} </ul>
+        : drawn
+    })
     ->React.array}
   </div>
 }

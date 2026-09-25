@@ -2,60 +2,10 @@
 // the port receives, so an act can be watched landing on the host.
 
 open Editor
-
-type shown = {mutable last: string}
-
-let section: Section.t = {
-  id: "open-sets",
-  blocks: [
-    (
-      "a",
-      "A **topology** on a set X is a collection τ of subsets of X, called _open sets_, such that:",
-    ),
-    ("b", "The empty set and X itself are open."),
-    ("c", "Any union of open sets is open, and any finite intersection of open sets is open."),
-    (
-      "d",
-      "See [compactness](/compactness) for what a finite subcover buys, and `U` for a typical open set.",
-    ),
-  ],
-}
-
-let shown = Tilia.tilia({last: ""})
-
-let storage: Section.storage = {
-  sections: [section],
-  update: sections => {
-    shown.last =
-      sections
-      ->Array.map(section =>
-        section.blocks->Array.map(((id, text)) => `@${id} ${text}`)->Array.join("\n")
-      )
-      ->Array.join("\n\n")
-  },
-}
-
-module Port = {
-  @react.component
-  let make = () => {
-    TiliaReact.useTilia()
-    <pre className="port" id="port"> {React.string(shown.last)} </pre>
-  }
-}
+open Course
 
 let state = View.prepare(section)
-
-// The id a new block takes: the first letter no block holds, the way the
-// model's harness mints, so a scenario that names ids reads the same here.
-let letters = "abcdefghijklmnopqrstuvwxyz"
-let mint = () => {
-  let taken = state.doc.blocks->Array.map(block => block.id)
-  let rec free = index => {
-    let id = Notation.letter(index)
-    taken->Array.includes(id) ? free(index + 1) : id
-  }
-  free(0)
-}
+let mint = mint(state)
 
 // The hook a browser test drives: load a document in the notation, read it
 // back in the notation.
@@ -75,7 +25,9 @@ module App = {
       <h1> {React.string("open sets")} </h1>
       <View state section storage mint />
       <p className="label"> {React.string("what the port received")} </p>
-      <Port />
+      <pre className="port" id="port">
+        <Received />
+      </pre>
     </main>
 }
 

@@ -1,0 +1,88 @@
+feature: Heading
+background:
+  given: an editor
+examples:
+  - scenario: heading turns the block holding the caret into a heading of its level
+    before: |
+      Open |sets
+    when: heading(1)
+    after: |
+      # Open |sets
+
+  - scenario: heading on a heading of the same level turns it back into prose
+    before: |
+      # Open |sets
+    when: heading(1)
+    after: |
+      Open |sets
+
+  - scenario: heading on a heading of another level changes the level
+    before: |
+      # Open |sets
+    when: heading(2)
+    after: |
+      ## Open |sets
+
+  - scenario: paragraph turns a heading into prose
+    before: |
+      ## Open |sets
+    when: paragraph
+    after: |
+      Open |sets
+
+  - scenario: heading over a selection across blocks sets every block
+    before: |
+      {Open sets
+      Closed sets}
+    when: heading(2)
+    after: |
+      ## {Open sets
+      ## Closed sets}
+
+  - scenario: enter at the end of a heading opens a paragraph under it
+    before: |
+      # Open sets|
+    when: enter
+    after: |
+      # Open sets
+      |
+
+  - scenario: enter at the start of a heading opens a paragraph above it
+    before: |
+      # |Open sets
+    when: enter
+    after: |
+
+      # |Open sets
+
+  - scenario: enter in the middle of a heading leaves a heading and a paragraph
+    before: |
+      # Open |sets and closed sets
+    when: enter
+    after: |
+      # Open
+      |sets and closed sets
+
+  - scenario: backspace at the start of a heading turns it into prose and does not join
+    before: |
+      The three axioms follow.
+      # |Open sets
+    when: backspace
+    after: |
+      The three axioms follow.
+      |Open sets
+
+  - scenario: backspace at the start of the prose after a heading joins it into the heading
+    before: |
+      # Open sets
+      |A set is open when it belongs to τ.
+    when: backspace
+    after: |
+      # Open sets |A set is open when it belongs to τ.
+
+  - scenario: a heading holds marks like any block
+    before: |
+      # The _open_ sets of |X
+    when: input(The open sets of a space |X)
+    after: |
+      # The _open_ sets of a space |X
