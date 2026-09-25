@@ -235,7 +235,9 @@ Copy writes the selection twice: as markdown in `text/plain` and as rendered
 marks in `text/html`. Paste reads `text/html` first and falls back to
 `text/plain`. Both parse into blocks and runs. A paste that yields one block
 inserts text and marks at the caret. A paste that yields several blocks
-splits the current block and puts the new blocks between the halves.
+splits the current block: the first pasted block joins the text before the
+caret, the last joins the text after, and the rest sit between as new
+blocks.
 
 A paste inside the same section is a change to one keyed array. A paste into
 another document must clone the rows its embeds name under the new section,

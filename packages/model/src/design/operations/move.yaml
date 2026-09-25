@@ -1,0 +1,41 @@
+feature: Move
+background:
+  given: an editor
+examples:
+  - scenario: moveUp lifts the block holding the caret above the previous one
+    before: |
+      @a Open sets are closed under unions.
+      @b |A topology is a collection of open sets.
+    when: moveUp
+    after: |
+      @b |A topology is a collection of open sets.
+      @a Open sets are closed under unions.
+
+  - scenario: moveDown lowers the block holding the caret under the next one
+    before: |
+      @a Open sets are |closed under unions.
+      @b A topology is a collection of open sets.
+    when: moveDown
+    after: |
+      @b A topology is a collection of open sets.
+      @a Open sets are |closed under unions.
+
+  - scenario: moveUp on the first block changes nothing
+    before: |
+      @a |A topology is a collection of open sets.
+      @b Open sets are closed under unions.
+    when: moveUp
+    after: |
+      @a |A topology is a collection of open sets.
+      @b Open sets are closed under unions.
+
+  - scenario: the blocks of a selection move together
+    before: |
+      @a Any finite intersection of open sets is open.
+      @b {The empty set and X are open.
+      @c Any union of open} sets is open.
+    when: moveUp
+    after: |
+      @b {The empty set and X are open.
+      @c Any union of open} sets is open.
+      @a Any finite intersection of open sets is open.

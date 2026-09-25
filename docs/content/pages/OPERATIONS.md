@@ -33,12 +33,13 @@ Hello world
 - The side of the caret at a marker says which marks are pending. `**open|**`
   types the next letter bold and `**open**|` does not. Empty markers around
   the caret, `**|**`, hold a pending mark in plain text.
-- The act is a word, with its argument in parentheses: `backspace`, `enter`,
-  `bold`, `italic`, `code`, `link(/open-sets)`,
-  `input(For every ε| there is a δ.)`. Several acts make a list:
-  `[enter, enter]`. The two arrows, `->` and `<-`, are acts too. The
-  argument of `input` is plain text: the browser knows no marks, so none are
-  read in it.
+- The act is a word, with its argument in parentheses: `backspace`,
+  `delete`, `enter`, `bold`, `italic`, `code`, `link(/open-sets)`, `moveUp`,
+  `moveDown`, `paste(...)` and `input(For every ε| there is a δ.)`. Several
+  acts make a list: `[enter, enter]`. The two arrows, `->` and `<-`, are acts
+  too. The argument of `input` is plain text: the browser knows no marks, so
+  none are read in it. The argument of `paste` is a document in the notation,
+  one line per pasted block.
 
 The text of every scenario comes from one course on topology. The course
 needs what the editor finds hard: inline math, LaTeX blocks, letters composed
@@ -66,9 +67,19 @@ block keeps its id.
 ## Split
 
 Enter splits the block at the caret. The first half keeps the id and the
-second half takes a new one.
+second half takes a new one. Over a selection, the selection goes first.
 
 {{splitOps}}
+
+## Delete
+
+Delete removes the character after the caret. At the end of a block it joins
+the next block onto it, the mirror of backspace, and the caret stays where it
+was. Over a selection, delete and backspace both remove it. A selection
+across blocks trims the first block, trims the last, drops the blocks
+between and joins the two ends. The first id survives.
+
+{{deleteOps}}
 
 ## Input
 
@@ -101,3 +112,20 @@ from outside a run lands inside it. Up and down depend on line layout and
 belong to the view, not the model.
 
 {{caretOps}}
+
+## Move
+
+A block moves one place at a time. The blocks a selection covers move
+together. Ids and offsets do not change, so the selection travels with them.
+
+{{moveOps}}
+
+## Paste
+
+One pasted block goes into the text at the caret. Several split the block:
+the first pasted block joins the text before the caret, the last joins the
+text after, both the way a join does, and the rest sit between as new
+blocks. The caret lands at the end of what was pasted. Over a selection, the
+selection goes first.
+
+{{pasteOps}}

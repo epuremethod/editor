@@ -4,9 +4,11 @@ open EpureVitest
 // the document after, all three in the notation. Ids are compared only when
 // the `after` names one, so a scenario about identity says so by writing it.
 //
-// An act is a word, with its argument in parentheses: `backspace`, `enter`,
-// `bold`, `link(/open-sets)`, `input(For every ε| there is a δ.)`. The two
-// arrows, `->` and `<-`, are acts too. Several acts make a list. The argument of `input` is one block as the browser left
+// An act is a word, with its argument in parentheses: `backspace`, `delete`,
+// `enter`, `bold`, `link(/open-sets)`, `moveUp`, `paste(...)`,
+// `input(For every ε| there is a δ.)`. The two arrows, `->` and `<-`, are
+// acts too. Several acts make a list. The argument of `paste` is a document
+// in the notation, one line per pasted block. The argument of `input` is one block as the browser left
 // it: plain text and the selection, with no marks, since the browser knows
 // none.
 
@@ -16,17 +18,23 @@ let actLine = /^(\w+|->|<-)(?:\((.*)\))?$/s
 
 // A new block takes the first letter no block holds, so an `after` written
 // without ids reads a split as `a` then `b`.
-let mint = (doc: Doc.t) => {
+let mintMany = (doc: Doc.t, count) => {
   let taken = doc.blocks->Array.map(block => block.id)
+  let out = []
   let rec free = index => {
     let id = Notation.letter(index)
-    taken->Array.includes(id) ? free(index + 1) : id
+    taken->Array.includes(id) || out->Array.includes(id) ? free(index + 1) : id
   }
-  free(0)
+  for _ in 1 to count {
+    out->Array.push(free(0))
+  }
+  out
 }
 
+let mint = (doc: Doc.t) => mintMany(doc, 1)->Array.getUnsafe(0)
+
 let act = (doc: Doc.t, said: string) => {
-  let (name, argument) = switch actLine->RegExp.exec(said) {
+  let (name, argument) = switch actLine->RegExp.exec(said->String.trim) {
   | Some(found) =>
     let matches = found->RegExp.Result.matches
     (matches->Array.getUnsafe(0)->Option.getOr(""), matches->Array.get(1)->Option.flatMap(x => x))
@@ -34,7 +42,14 @@ let act = (doc: Doc.t, said: string) => {
   }
   switch (name, argument) {
   | ("backspace", None) => Edit.deleteBackward(doc)
+  | ("delete", None) => Edit.deleteForward(doc)
   | ("enter", None) => Edit.split(doc, ~id=mint(doc))
+  | ("moveUp", None) => Edit.moveUp(doc)
+  | ("moveDown", None) => Edit.moveDown(doc)
+  | ("paste", Some(source)) =>
+    let {doc: pasted} = Notation.read(source)
+    let blocks = pasted.blocks->Array.map(block => block.content)
+    Edit.paste(doc, ~blocks, ~ids=mintMany(doc, blocks->Array.length - 1))
   | ("->", None) => Edit.right(doc)
   | ("<-", None) => Edit.left(doc)
   | ("bold", None) => Edit.toggle(doc, ~mark="bold")

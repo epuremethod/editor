@@ -1,0 +1,46 @@
+feature: Paste
+background:
+  given: an editor
+examples:
+  - scenario: pasting one block inserts its text at the caret
+    before: |
+      For every ε there is a |.
+    when: paste(δ with the same property)
+    after: |
+      For every ε there is a δ with the same property|.
+
+  - scenario: pasted marks come along
+    before: |
+      The preimage of an open set under a |map is open.
+    when: paste(**continuous** )
+    after: |
+      The preimage of an open set under a **continuous** |map is open.
+
+  - scenario: pasting over a selection replaces it
+    before: |
+      A space is compact when every open cover has a {countable} subcover.
+    when: paste(finite)
+    after: |
+      A space is compact when every open cover has a finite| subcover.
+
+  - scenario: pasting several blocks splits the block, and the first and last pasted blocks join the halves
+    before: |
+      @a A topology on X has three axioms: |and that is all.
+    when: |-
+      paste(the empty set and X are open.
+      Any union of open sets is open.
+      Any finite intersection of open sets is open,)
+    after: |
+      @a A topology on X has three axioms: the empty set and X are open.
+      @b Any union of open sets is open.
+      @c Any finite intersection of open sets is open,| and that is all.
+
+  - scenario: pasting several blocks at the end of a block leaves the caret at the end of the last one
+    before: |
+      A topology on X has three axioms.|
+    when: |-
+      paste(The empty set and X are open.
+      Any union of open sets is open.)
+    after: |
+      A topology on X has three axioms. The empty set and X are open.
+      Any union of open sets is open.|

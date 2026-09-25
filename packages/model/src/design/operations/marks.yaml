@@ -101,3 +101,12 @@ examples:
     when: backspace
     after: |
       **Closed sets |are the complements of open sets.**
+
+  - scenario: bold over a selection across blocks marks both parts
+    before: |
+      Any union of {open sets is open.
+      Any finite intersection} of open sets is open.
+    when: bold
+    after: |
+      Any union of {**open sets is open.**
+      **Any finite intersection**} of open sets is open.

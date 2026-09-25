@@ -57,6 +57,9 @@ build:
       inputOps: {file: ../../packages/model/src/design/operations/input.yaml, transform: operations}
       marksOps: {file: ../../packages/model/src/design/operations/marks.yaml, transform: operations}
       caretOps: {file: ../../packages/model/src/design/operations/caret.yaml, transform: operations}
+      deleteOps: {file: ../../packages/model/src/design/operations/delete.yaml, transform: operations}
+      moveOps: {file: ../../packages/model/src/design/operations/move.yaml, transform: operations}
+      pasteOps: {file: ../../packages/model/src/design/operations/paste.yaml, transform: operations}
       pageBody: {file: pages/OPERATIONS.md, transform: docsMd}
       operationsToc: {file: pages/OPERATIONS.md, transform: docsToc}
       operationsCurrent: ' aria-current="page"'

@@ -106,18 +106,38 @@ function line(source) {
   return doc.blocks.map(block => text(doc, block)).join("")
 }
 
+// The argument of `paste`, a document in the notation, drawn one block a line.
+function lines(source) {
+  const {doc} = read(source)
+  return doc.blocks.map(block => text(doc, block)).join("\n")
+}
+
 const actLine = /^(\w+|->|<-)(?:\((.*)\))?$/s
 
 function parsed(when) {
   return (Array.isArray(when) ? when : [when]).map(said => {
-    const found = actLine.exec(said)
+    const found = actLine.exec(said.trim())
     if (!found) throw new Error(`An act reads as a word with an argument: ${said}`)
     return {name: found[1], argument: found[2]}
   })
 }
 
 // One keycap per act: the key that runs it.
-const keys = {backspace: "⌫", enter: "↵", input: "a", "->": "→", "<-": "←", bold: "B", italic: "I", code: "`", link: "K"}
+const keys = {
+  backspace: "⌫",
+  delete: "⌦",
+  enter: "↵",
+  input: "a",
+  "->": "→",
+  "<-": "←",
+  bold: "B",
+  italic: "I",
+  code: "`",
+  link: "K",
+  moveUp: "⇧↑",
+  moveDown: "⇧↓",
+  paste: "⌘V",
+}
 
 function sign(name) {
   return `<span class="op__key" aria-hidden="true">${keys[name] ?? "→"}</span>`
@@ -137,7 +157,7 @@ function arguments_(when) {
     const shown =
       argument === undefined
         ? ""
-        : `<span class="op__argument-text">${name === "input" ? line(argument) : escape(argument)}</span>`
+        : `<span class="op__argument-text">${name === "input" ? line(argument) : name === "paste" ? lines(argument) : escape(argument)}</span>`
     return `<div class="op__argument"><kbd class="op__act-name">${escape(name)}</kbd>${shown}</div>`
   })
   return `<div class="op__arguments">${rows.join("")}</div>`

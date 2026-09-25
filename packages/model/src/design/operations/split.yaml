@@ -42,3 +42,11 @@ examples:
       The circle and the square are homeomorphic.
 
       |The circle and the line are not.
+
+  - scenario: enter over a selection removes it and splits there
+    before: |
+      The circle {and the square} are homeomorphic.
+    when: enter
+    after: |
+      The circle
+      |are homeomorphic.

@@ -73,14 +73,11 @@ let deleteRange = (doc: Doc.t, selection: Doc.selection): Doc.t => {
   }
 }
 
-// Joins a block with the one before it. A space parts the two texts when
-// both hold text and neither brings its own. The caret lands where the
-// second text starts.
-let join = (doc: Doc.t, index): Doc.t => {
-  let previous = blockAt(doc, index - 1)
-  let current = blockAt(doc, index)
-  let a = previous.content
-  let b = current.content
+type side = First | Second
+
+// Two texts put end to end. A space parts them when both hold text and
+// neither brings its own; the space takes the marks the two ends share.
+let seamed = (a: Doc.text, b: Doc.text) => {
   let spaced =
     a.text != "" &&
     b.text != "" &&
@@ -98,8 +95,21 @@ let join = (doc: Doc.t, index): Doc.t => {
         ),
       }
     : {text: "", marks: []}
-  let content = Runs.concat(Runs.concat(a, seam), b)
-  let offset = a.text->String.length + seam.text->String.length
+  (Runs.concat(Runs.concat(a, seam), b), seam.text->String.length)
+}
+
+// Joins a block with the one before it. The caret lands at the seam, on the
+// side the caller says: the end of the first text or the start of the
+// second.
+let join = (doc: Doc.t, index, ~side): Doc.t => {
+  let previous = blockAt(doc, index - 1)
+  let current = blockAt(doc, index)
+  let a = previous.content
+  let (content, gap) = seamed(a, current.content)
+  let offset = switch side {
+  | First => a.text->String.length
+  | Second => a.text->String.length + gap
+  }
   let blocks =
     doc.blocks
     ->Array.slice(~start=0, ~end=index - 1)
@@ -118,12 +128,34 @@ let deleteBackward = (doc: Doc.t): Doc.t =>
   | Some({focus: {block, offset}}) =>
     let index = indexOf(doc, block)
     if offset == 0 {
-      index == 0 ? doc : join(doc, index)
+      index == 0 ? doc : join(doc, index, ~side=Second)
     } else {
       let content = blockAt(doc, index).content
       let from = Runs.back(content.text, offset)
       let content = Runs.splice(content, ~from, ~to=offset, ~inserted={text: "", marks: []})
       {...replace(doc, index, content), selection: caret(block, from, Runs.before(content, from))}
+    }
+  }
+
+// Delete. Over a range it removes the range. At the end of a block it joins
+// the next block onto it. Elsewhere it removes the character after the
+// caret.
+let deleteForward = (doc: Doc.t): Doc.t =>
+  switch doc.selection {
+  | None => doc
+  | Some(selection) if !collapsed(selection) => deleteRange(doc, selection)
+  | Some({focus: {block, offset}}) =>
+    let index = indexOf(doc, block)
+    let content = blockAt(doc, index).content
+    if offset == content.text->String.length {
+      index + 1 < doc.blocks->Array.length ? join(doc, index + 1, ~side=First) : doc
+    } else {
+      let to = Runs.forward(content.text, offset)
+      let content = Runs.splice(content, ~from=offset, ~to, ~inserted={text: "", marks: []})
+      {
+        ...replace(doc, index, content),
+        selection: caret(block, offset, Runs.before(content, offset)),
+      }
     }
   }
 
@@ -144,11 +176,12 @@ let leadingBlank = (text: string, offset) => {
 }
 
 // Splits the block holding the caret. The first half keeps its id; the second
-// takes `id`, which the caller minted. The spaces at the seam go.
-let split = (doc: Doc.t, ~id: Doc.id): Doc.t =>
+// takes `id`, which the caller minted. The spaces at the seam go. Over a
+// range, the range goes first.
+let rec split = (doc: Doc.t, ~id: Doc.id): Doc.t =>
   switch doc.selection {
   | None => doc
-  | Some(selection) if !collapsed(selection) => doc
+  | Some(selection) if !collapsed(selection) => split(deleteRange(doc, selection), ~id)
   | Some({focus: {block, offset}}) =>
     let index = indexOf(doc, block)
     let content = blockAt(doc, index).content
@@ -405,5 +438,95 @@ let left = (doc: Doc.t): Doc.t =>
         {...doc, selection: caret(previous.id, end, last(Runs.states(previous.content, end)))}
       | None => doc
       }
+    }
+  }
+
+// The first and last block a selection covers, by index.
+let reach = (doc: Doc.t, selection: Doc.selection) => {
+  let (start, stop) = ordered(doc, selection)
+  (indexOf(doc, start.block), indexOf(doc, stop.block))
+}
+
+let moveBlocks = (doc: Doc.t, ~from, ~to, ~by): Doc.t => {
+  let moved = doc.blocks->Array.slice(~start=from, ~end=to + 1)
+  let rest =
+    doc.blocks
+    ->Array.slice(~start=0, ~end=from)
+    ->Array.concat(doc.blocks->Array.slice(~start=to + 1, ~end=doc.blocks->Array.length))
+  let at = from + by
+  let blocks =
+    rest
+    ->Array.slice(~start=0, ~end=at)
+    ->Array.concat(moved)
+    ->Array.concat(rest->Array.slice(~start=at, ~end=rest->Array.length))
+  {...doc, blocks}
+}
+
+// Lifts the blocks the selection covers above the block before them. The
+// selection travels with them, since ids and offsets do not change.
+let moveUp = (doc: Doc.t): Doc.t =>
+  switch doc.selection {
+  | None => doc
+  | Some(selection) =>
+    let (from, to) = reach(doc, selection)
+    from == 0 ? doc : moveBlocks(doc, ~from, ~to, ~by=-1)
+  }
+
+// Lowers the blocks the selection covers under the block after them.
+let moveDown = (doc: Doc.t): Doc.t =>
+  switch doc.selection {
+  | None => doc
+  | Some(selection) =>
+    let (from, to) = reach(doc, selection)
+    to + 1 >= doc.blocks->Array.length ? doc : moveBlocks(doc, ~from, ~to, ~by=1)
+  }
+
+// Pastes blocks at the caret, over the selection when there is one. One
+// block goes into the text at the caret. Several split the block: the first
+// pasted block joins the text before the caret, the last joins the text
+// after, both the way a join does, and the rest sit between as new blocks. The new blocks take `ids`,
+// one per block after the first, which the caller minted. The caret lands
+// at the end of what was pasted.
+let rec paste = (doc: Doc.t, ~blocks: array<Doc.text>, ~ids: array<Doc.id>): Doc.t =>
+  switch doc.selection {
+  | None => doc
+  | Some(selection) if !collapsed(selection) => paste(deleteRange(doc, selection), ~blocks, ~ids)
+  | Some({focus: {block, offset}}) =>
+    let index = indexOf(doc, block)
+    let content = blockAt(doc, index).content
+    let count = blocks->Array.length
+    switch (blocks->Array.get(0), blocks->Array.get(count - 1)) {
+    | (Some(first), Some(last)) if count == 1 =>
+      last->ignore
+      let content = Runs.splice(content, ~from=offset, ~to=offset, ~inserted=first)
+      let offset = offset + first.text->String.length
+      {
+        ...replace(doc, index, content),
+        selection: caret(block, offset, Runs.before(content, offset)),
+      }
+    | (Some(first), Some(last)) =>
+      if ids->Array.length != count - 1 {
+        panic("paste takes one id for every block after the first")
+      }
+      let (head, _) = seamed(Runs.slice(content, ~from=0, ~to=offset), first)
+      let (tail, _) = seamed(
+        last,
+        Runs.slice(content, ~from=offset, ~to=content.text->String.length),
+      )
+      let between =
+        blocks
+        ->Array.slice(~start=1, ~end=count - 1)
+        ->Array.mapWithIndex((text, at) => {Doc.id: ids->Array.getUnsafe(at), content: text})
+      let lastId = ids->Array.getUnsafe(count - 2)
+      let blocks =
+        doc.blocks
+        ->Array.slice(~start=0, ~end=index)
+        ->Array.concat([{Doc.id: block, content: head}])
+        ->Array.concat(between)
+        ->Array.concat([{id: lastId, content: tail}])
+        ->Array.concat(doc.blocks->Array.slice(~start=index + 1, ~end=doc.blocks->Array.length))
+      let offset = last.text->String.length
+      {blocks, selection: caret(lastId, offset, Runs.before(tail, offset))}
+    | _ => doc
     }
   }

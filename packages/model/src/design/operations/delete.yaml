@@ -1,0 +1,58 @@
+feature: Delete
+background:
+  given: an editor
+examples:
+  - scenario: delete removes the character after the caret
+    before: |
+      Every open ball is a|n open set.
+    when: delete
+    after: |
+      Every open ball is a| open set.
+
+  - scenario: delete at the end of a block joins it with the next one and keeps its id
+    before: |
+      @a A set is closed when its complement is open.|
+      @b Both the empty set and X are closed.
+    when: delete
+    after: |
+      @a A set is closed when its complement is open.| Both the empty set and X are closed.
+
+  - scenario: delete at the end of the last block changes nothing
+    before: |
+      The closure of A is the smallest closed set containing A.|
+    when: delete
+    after: |
+      The closure of A is the smallest closed set containing A.|
+
+  - scenario: delete over a selection removes it
+    before: |
+      A space is compact when every open cover has a {countable }subcover.
+    when: delete
+    after: |
+      A space is compact when every open cover has a |subcover.
+
+  - scenario: backspace over a selection across blocks trims both ends, drops the blocks between and joins
+    before: |
+      @a Every metric space is {Hausdorff.
+      @b Every subspace of a Hausdorff space is Hausdorff.
+      @c The product of two Hausdorff spaces is }Hausdorff.
+    when: backspace
+    after: |
+      @a Every metric space is |Hausdorff.
+
+  - scenario: delete over a selection across blocks does the same
+    before: |
+      @a Every metric space is {Hausdorff.
+      @b Every subspace of a Hausdorff space is Hausdorff.
+      @c The product of two Hausdorff spaces is }Hausdorff.
+    when: delete
+    after: |
+      @a Every metric space is |Hausdorff.
+
+  - scenario: a selection across blocks keeps the marks outside it
+    before: |
+      **Every** metric space is {Hausdorff.
+      The product of two Hausdorff spaces is }**Hausdorff**.
+    when: backspace
+    after: |
+      **Every** metric space is |**Hausdorff**.
