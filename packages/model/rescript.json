@@ -1,0 +1,35 @@
+{
+  "name": "@editor/model",
+  "namespace": "Editor",
+  "sources": [
+    {
+      "dir": "src/domain",
+      "public": [],
+      "subdirs": [
+        {
+          "dir": "api",
+          "public": []
+        },
+        {
+          "dir": "feature",
+          "public": []
+        }
+      ]
+    },
+    {
+      "dir": "src/design",
+      "subdirs": true,
+      "public": [],
+      "type": "dev"
+    }
+  ],
+  "package-specs": {
+    "module": "esmodule",
+    "in-source": true
+  },
+  "suffix": ".res.mjs",
+  "dependencies": [],
+  "dev-dependencies": [
+    "@epure/vitest"
+  ]
+}

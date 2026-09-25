@@ -1,0 +1,636 @@
+/* Die neue Typographie: black on white, one geometric sans, an asymmetric
+   grid held by rules, and red for the one thing that must be seen. The
+   contents stand in a black column on the left and never scroll. */
+
+:root {
+  color-scheme: light;
+  --white: #ffffff;
+  --black: #000000;
+  --grey: #6b6b6b;
+  --grey-light: #d9d9d9;
+  --grey-faint: #f1f1f1;
+  --red: #e2231a;
+  --sans: Jost, Futura, "Century Gothic", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --mono: "IBM Plex Mono", "SFMono-Regular", Menlo, Consolas, monospace;
+  --contents: 17rem;
+  --measure: 46rem;
+}
+
+* { box-sizing: border-box; }
+
+html { background: var(--white); }
+
+body {
+  margin: 0;
+  font-family: var(--sans);
+  font-size: 1.1rem;
+  font-weight: 400;
+  line-height: 1.5;
+  color: var(--black);
+  background: var(--white);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* The contents: a black column. */
+
+.contents {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: var(--contents);
+  padding: 2.4rem 1.6rem 1.6rem 2rem;
+  background: var(--white);
+  color: var(--black);
+  border-right: 1px solid var(--black);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.brand {
+  display: block;
+  margin: 0 0 3rem;
+  font-size: 2.2rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  text-transform: lowercase;
+  color: var(--black);
+  text-decoration: none;
+}
+
+.brand::after {
+  content: "";
+  display: block;
+  width: 3rem;
+  height: 0.5rem;
+  margin-top: 0.8rem;
+  background: var(--red);
+}
+
+.contents__label {
+  margin: 0 0 0.8rem;
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--grey);
+}
+
+.contents ol { margin: 0; padding: 0; list-style: none; }
+
+.contents__pages > li {
+  margin: 0;
+  padding: 0.5rem 0;
+  border-top: 1px solid var(--grey-light);
+}
+
+.contents__pages > li:last-child { border-bottom: 1px solid var(--grey-light); }
+
+.contents__pages > li > a {
+  font-size: 1.2rem;
+  font-weight: 500;
+  text-transform: lowercase;
+}
+
+.contents a {
+  color: var(--black);
+  text-decoration: none;
+}
+
+.contents a:hover { color: var(--red); }
+
+.contents__pages > li > a[aria-current="page"] {
+  color: var(--red);
+}
+
+.contents__sections {
+  margin: 0.5rem 0 0.3rem !important;
+  counter-reset: section;
+}
+
+.contents__sections > li {
+  margin: 0.3rem 0;
+  font-size: 0.95rem;
+  font-weight: 400;
+  text-transform: lowercase;
+  counter-increment: section;
+  display: grid;
+  grid-template-columns: 1.6rem minmax(0, 1fr);
+  column-gap: 0.4rem;
+}
+
+.contents__sections > li::before {
+  content: counter(section, decimal-leading-zero);
+  font-size: 0.72rem;
+  font-weight: 500;
+  padding-top: 0.25rem;
+  color: var(--red);
+  letter-spacing: 0.05em;
+}
+
+.contents__sections > li > a { grid-column: 2; }
+
+.contents__colophon {
+  margin: auto 0 0;
+  padding-top: 2rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--grey);
+}
+
+/* The page: everything hangs from the left edge. */
+
+.page {
+  margin-left: var(--contents);
+  padding: 2.4rem 3rem 6rem 4rem;
+}
+
+.running-head {
+  display: flex;
+  justify-content: space-between;
+  max-width: var(--measure);
+  margin: 0 0 4rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid var(--black);
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+}
+
+.prose { max-width: var(--measure); }
+
+.prose h1 {
+  margin: 0 0 3rem;
+  font-size: 4.2rem;
+  font-weight: 700;
+  line-height: 0.95;
+  letter-spacing: -0.04em;
+  text-transform: lowercase;
+}
+
+.prose h1::after {
+  content: "";
+  display: block;
+  width: 6rem;
+  height: 0.6rem;
+  margin-top: 1.4rem;
+  background: var(--red);
+}
+
+.prose h2 {
+  margin: 4.5rem 0 1.4rem;
+  padding: 0.5rem 0.9rem 0.55rem;
+  background: var(--black);
+  color: var(--white);
+  font-size: 1.7rem;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  text-transform: lowercase;
+}
+
+.prose h2 .heading-anchor { color: transparent; }
+.prose h2:hover .heading-anchor { color: var(--red); }
+
+.prose h3 {
+  margin: 2.2rem 0 0.6rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid var(--grey-light);
+  font-size: 1.1rem;
+  font-weight: 500;
+  text-transform: lowercase;
+}
+
+.heading-anchor {
+  margin-left: 0.5em;
+  font-size: 0.5em;
+  vertical-align: middle;
+  color: transparent;
+  text-decoration: none;
+}
+
+.prose h2:hover .heading-anchor,
+.prose h3:hover .heading-anchor { color: var(--red); }
+
+.prose p, .prose ul, .prose ol { margin: 0 0 1.1rem; }
+
+.prose ul { padding-left: 1.5em; list-style: none; }
+
+.prose ul > li::before {
+  content: "";
+  display: inline-block;
+  width: 0.7em;
+  height: 1px;
+  margin: 0 0.8em 0 -1.5em;
+  vertical-align: 0.35em;
+  background: var(--black);
+}
+
+.prose ol { padding-left: 1.6em; }
+
+.prose ol > li::marker { font-weight: 500; }
+
+.prose li { margin: 0.3rem 0; }
+
+.prose a { color: var(--black); text-decoration: underline; text-decoration-color: var(--red); text-decoration-thickness: 2px; text-underline-offset: 0.15em; }
+.prose a:hover { color: var(--red); }
+
+.prose strong { font-weight: 700; }
+
+.prose code {
+  font-family: var(--mono);
+  font-size: 0.82em;
+  background: var(--grey-faint);
+  padding: 0.05em 0.3em;
+}
+
+.prose pre {
+  margin: 0 0 1.4rem;
+  padding: 1rem 1.2rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: var(--grey-faint);
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.prose pre code { background: none; padding: 0; font-size: inherit; }
+
+.table-wrap { overflow-x: auto; margin: 0 0 1.4rem; }
+
+.prose table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.95rem;
+  border-top: 1px solid var(--black);
+  border-bottom: 1px solid var(--black);
+}
+
+.prose th, .prose td {
+  text-align: left;
+  padding: 0.45rem 0.8rem 0.45rem 0;
+  vertical-align: top;
+}
+
+.prose th {
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--black);
+}
+
+.prose tr + tr td { border-top: 1px solid var(--grey-light); }
+
+.tailpiece {
+  max-width: var(--measure);
+  height: 1px;
+  margin: 5rem 0 0;
+  background: var(--black);
+}
+
+/* The plate: before, the act, after. A number, a rule, a grid. */
+
+.prose { counter-reset: plate; }
+
+.op {
+  margin: 2.4rem 0 3rem;
+  padding: 0;
+  counter-increment: plate;
+  border-top: 2px solid var(--black);
+  font-size: 0.8em;
+}
+
+.op__head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: baseline;
+  column-gap: 1.2rem;
+  padding: 0.7rem 0 0.9rem;
+}
+
+.op__head::before {
+  content: counter(plate, decimal-leading-zero);
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--red);
+}
+
+.op__title {
+  font-size: 1.1em;
+  font-weight: 500;
+  line-height: 1.3;
+}
+
+.op__feature {
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+}
+
+.op__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 7rem minmax(0, 1fr);
+  align-items: stretch;
+  border-top: 1px solid var(--grey-light);
+  border-bottom: 1px solid var(--black);
+}
+
+.op__grid { border-bottom-color: var(--grey-light); }
+
+.op__side { padding: 1rem 0 1.2rem; }
+
+.op__side--before { padding-right: 1.2rem; }
+
+.op__side--after { padding-left: 1.2rem; }
+
+.op__act {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 1rem 0.8rem;
+  border-left: 1px solid var(--grey-light);
+  border-right: 1px solid var(--grey-light);
+  background: #f8f8f8;
+  color: var(--black);
+}
+
+.op__key {
+  display: inline-block;
+  min-width: 1.5rem;
+  height: 1.5rem;
+  padding: 0 0.3rem;
+  border: 1px solid var(--black);
+  border-bottom-width: 2px;
+  border-radius: 3px;
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  line-height: 1.4rem;
+  text-align: center;
+  color: var(--black);
+  background: var(--white);
+}
+
+.op__act-name {
+  font-family: var(--mono);
+  font-size: 0.85em;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+}
+
+.op__argument .op__act-name { font-size: 0.8em; }
+
+.op__arguments {
+  display: grid;
+  gap: 0.4rem;
+  padding: 0.7rem 0 0.8rem;
+  border-bottom: 1px solid var(--black);
+}
+
+.op__argument {
+  display: grid;
+  grid-template-columns: 5rem minmax(0, 1fr);
+  column-gap: 0.8rem;
+  align-items: baseline;
+}
+
+.op__argument-text {
+  min-width: 0;
+  font-family: var(--mono);
+  font-size: 0.9em;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.prose .op__label {
+  margin: 0 0 0.8rem;
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--grey);
+}
+
+/* The tree of blocks: a black square holds each id, the text runs beside
+   it on a rule, and the caret is a red stroke. */
+
+.prose .tree {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.prose .tree__block {
+  margin: 0;
+  display: grid;
+  grid-template-columns: 1.5rem minmax(0, 1fr);
+  gap: 0.6rem;
+  align-items: start;
+}
+
+.tree__id {
+  display: block;
+  width: 1.5rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  line-height: 1.5rem;
+  text-align: center;
+  color: var(--black);
+}
+
+.tree__text {
+  min-width: 0;
+  font-size: 1.05em;
+  line-height: 1.5rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  border-bottom: 1px solid var(--grey-light);
+}
+
+.tree__empty { color: var(--grey-light); }
+
+.tree__caret {
+  display: inline-block;
+  width: 3px;
+  height: 1.1em;
+  margin: 0 -1px;
+  vertical-align: -0.2em;
+  background: var(--red);
+}
+
+.tree__range {
+  background: #fbdcd9;
+  color: inherit;
+  box-shadow: inset 0 -2px 0 var(--red);
+}
+
+/* The schema: a structure drawn as nested frames. A frame is a row, and a
+   frame inside a frame hangs under it. The blocks of a section are drawn
+   the way a plate draws them, so a row and an entry never look alike. */
+
+.schema {
+  margin: 1.8rem 0 2.2rem;
+  padding: 0;
+  font-size: 0.8em;
+}
+
+.schema__row {
+  border: 1px solid var(--black);
+  background: var(--white);
+}
+
+.schema__row + .schema__row,
+.schema__tree + .schema__row,
+.schema__row + .schema__tree { margin-top: 0.8rem; }
+
+.schema__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.2rem 0.8rem;
+  margin: 0;
+  padding: 0.55rem 0.9rem 0.5rem;
+  border-bottom: 1px solid var(--grey-light);
+}
+
+.schema__row > .schema__head:last-child { border-bottom: 0; }
+
+.schema__class {
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--red);
+}
+
+.schema__label {
+  font-size: 1.05em;
+  font-weight: 500;
+}
+
+.schema__badges { margin-left: auto; display: flex; gap: 0.3rem; }
+
+.schema__badge {
+  display: inline-block;
+  padding: 0.05em 0.45em;
+  border: 1px solid var(--grey-light);
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--grey);
+  white-space: nowrap;
+}
+
+.tree__text .schema__badge { margin-left: 0.6em; vertical-align: 0.15em; }
+
+.schema__body {
+  padding: 0.9rem 0.9rem 1rem 1.4rem;
+  background: #fafafa;
+}
+
+.schema__body > .schema__body { background: var(--white); }
+
+.prose .schema__tree { margin: 0; }
+
+.schema__embed::before {
+  content: "→ ";
+  color: var(--red);
+  font-weight: 700;
+}
+
+.schema__embed {
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+.schema__formula {
+  font-family: var(--mono);
+  font-size: 0.9em;
+  background: none;
+  padding: 0;
+}
+
+.prose .schema__caption {
+  margin: 0.7rem 0 0;
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--grey);
+}
+
+/* The flow: steps on one rule, an arrow between each two. */
+
+.flow {
+  margin: 1.8rem 0 2.2rem;
+  padding: 0;
+  font-size: 0.8em;
+}
+
+.prose .flow__steps {
+  margin: 0;
+  padding: 0.9rem 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+  gap: 1rem 0;
+  border-top: 1px solid var(--black);
+  border-bottom: 1px solid var(--grey-light);
+}
+
+.prose .flow__step {
+  margin: 0;
+  min-width: 0;
+  display: grid;
+  gap: 0.2rem;
+  padding: 0 1.4rem 0 0;
+  position: relative;
+}
+
+.flow__step + .flow__step { padding-left: 1.4rem; }
+
+.flow__step + .flow__step::before {
+  content: "→";
+  position: absolute;
+  left: -0.4rem;
+  top: -0.1rem;
+  font-size: 1.3em;
+  font-weight: 700;
+  color: var(--red);
+}
+
+.flow__name { font-size: 1.05em; font-weight: 500; }
+
+.flow__note { font-size: 0.9em; color: var(--grey); line-height: 1.35; }
+
+@media (max-width: 58rem) {
+  .contents {
+    position: static;
+    width: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--black);
+    padding: 1.6rem 1.25rem 1.2rem;
+  }
+  .brand { margin-bottom: 1.2rem; }
+  .contents__colophon { display: none; }
+  .page { margin-left: 0; padding: 2rem 1.25rem 4rem; }
+  .prose h1 { font-size: 3rem; }
+  .op__grid { grid-template-columns: minmax(0, 1fr); }
+  .op__side--before { padding-right: 0; }
+  .op__side--after { padding-left: 0; }
+  .schema__body { padding-left: 0.9rem; }
+  .op__act { justify-content: flex-start; padding: 0.6rem 0.8rem; border-left: 0; border-right: 0; border-top: 1px solid var(--grey-light); border-bottom: 1px solid var(--grey-light); }
+}

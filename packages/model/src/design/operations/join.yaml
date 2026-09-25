@@ -1,0 +1,38 @@
+feature: Join
+background:
+  given: an editor
+examples:
+  - scenario: backspace at the start of a block joins it with the previous one using a space
+    before: |
+      A topology on a set X is a collection of subsets called open sets.
+      |The empty set and X itself are open.
+    when: backspace
+    after: |
+      A topology on a set X is a collection of subsets called open sets. |The empty set and X itself are open.
+
+  - scenario: the joined block keeps the first id
+    before: |
+      @a Any union of open sets is open.
+      @b |Any finite intersection of open sets is open.
+    when: backspace
+    after: |
+      @a Any union of open sets is open. |Any finite intersection of open sets is open.
+
+  - scenario: backspace at the start of the first block changes nothing
+    before: |
+      |A set is closed when its complement is open.
+      Both the empty set and X are closed.
+    when: backspace
+    after: |
+      |A set is closed when its complement is open.
+      Both the empty set and X are closed.
+
+  - scenario: joining an empty block removes it and leaves the caret at the end of the previous one
+    before: |
+      The closure of A is the smallest closed set containing A.
+      |
+      The interior of A is the largest open set inside A.
+    when: backspace
+    after: |
+      The closure of A is the smallest closed set containing A.|
+      The interior of A is the largest open set inside A.

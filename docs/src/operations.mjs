@@ -1,0 +1,134 @@
+// The `operations` transform: a YAML fixture of `@epure/vitest`, rendered as
+// one card per scenario. Each card draws the document before the act and the
+// document after it, read with the model's own notation reader, so the page
+// shows exactly what the test reads.
+
+import {parse} from "yaml"
+import {read} from "@editor/model/src/domain/feature/Notation.res.mjs"
+import {slugify} from "./markdown.mjs"
+
+function escape(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+}
+
+// The part of the selection that lands in one block: a caret offset, or the
+// range the block holds of it.
+function within(doc, block) {
+  const selection = doc.selection
+  if (!selection) return {}
+  const index = id => doc.blocks.findIndex(candidate => candidate.id === id)
+  const [start, stop] = [selection.anchor, selection.focus].sort(
+    (a, b) => index(a.block) - index(b.block) || a.offset - b.offset,
+  )
+  if (start.block === stop.block && start.offset === stop.offset) {
+    return start.block === block.id ? {caret: start.offset} : {}
+  }
+  const here = index(block.id)
+  const from = index(start.block)
+  const to = index(stop.block)
+  if (here < from || here > to) return {}
+  const length = block.content.text.length
+  return {
+    range: [here === from ? start.offset : 0, here === to ? stop.offset : length],
+  }
+}
+
+function text(doc, block) {
+  const value = block.content.text
+  const {caret, range} = within(doc, block)
+  if (caret !== undefined) {
+    return `${escape(value.slice(0, caret))}<span class="tree__caret"></span>${escape(value.slice(caret))}`
+  }
+  if (range) {
+    const [start, stop] = range
+    return `${escape(value.slice(0, start))}<mark class="tree__range">${escape(value.slice(start, stop))}</mark>${escape(value.slice(stop))}`
+  }
+  return escape(value)
+}
+
+function tree(doc) {
+  const blocks = doc.blocks
+    .map(
+      block =>
+        `<li class="tree__block"><span class="tree__id">${escape(block.id)}</span><span class="tree__text">${text(doc, block) || '<span class="tree__empty">—</span>'}</span></li>`,
+    )
+    .join("")
+  return `<ol class="tree">${blocks}</ol>`
+}
+
+// A caret or a selection written into one line of the notation, drawn the
+// way a block draws it.
+function line(source) {
+  const {doc} = read(source)
+  return doc.blocks.map(block => text(doc, block)).join("")
+}
+
+const actLine = /^(\w+)(?:\((.*)\))?$/s
+
+function parsed(when) {
+  return (Array.isArray(when) ? when : [when]).map(said => {
+    const found = actLine.exec(said)
+    if (!found) throw new Error(`An act reads as a word with an argument: ${said}`)
+    return {name: found[1], argument: found[2]}
+  })
+}
+
+// One keycap per act: the key that runs it.
+const keys = {backspace: "⌫", enter: "↵", input: "a"}
+
+function sign(name) {
+  return `<span class="op__key" aria-hidden="true">${keys[name] ?? "→"}</span>`
+}
+
+// The keycaps sit between the two panels. The acts themselves, name and
+// argument, take a row under the panels, since an argument of `input` is a
+// whole block in the notation and is drawn with its caret.
+function acts(when) {
+  return parsed(when)
+    .map(({name}) => sign(name))
+    .join("")
+}
+
+function arguments_(when) {
+  const rows = parsed(when).map(({name, argument}) => {
+    const shown =
+      argument === undefined
+        ? ""
+        : `<span class="op__argument-text">${name === "input" ? line(argument) : escape(argument)}</span>`
+    return `<div class="op__argument"><kbd class="op__act-name">${escape(name)}</kbd>${shown}</div>`
+  })
+  return `<div class="op__arguments">${rows.join("")}</div>`
+}
+
+function card(example, feature) {
+  for (const field of ["scenario", "before", "when", "after"]) {
+    if (example[field] === undefined) {
+      throw new Error(`An operation scenario says no ${field} (${feature})`)
+    }
+  }
+  const before = read(example.before).doc
+  const after = read(example.after).doc
+  return [
+    `<figure class="op" id="${slugify(example.scenario)}">`,
+    `<figcaption class="op__head"><span class="op__title">${escape(example.scenario)}</span><span class="op__feature">${escape(feature)}</span></figcaption>`,
+    '<div class="op__grid">',
+    `<section class="op__side op__side--before"><p class="op__label">Before</p>${tree(before)}</section>`,
+    `<div class="op__act">${acts(example.when)}</div>`,
+    `<section class="op__side op__side--after"><p class="op__label">After</p>${tree(after)}</section>`,
+    "</div>",
+    arguments_(example.when),
+    "</figure>",
+  ].join("")
+}
+
+export function operations(source) {
+  const fixture = parse(source)
+  if (!fixture || typeof fixture.feature !== "string" || !Array.isArray(fixture.examples)) {
+    throw new Error("An operations fixture holds a feature and its examples")
+  }
+  return fixture.examples.map(example => card(example, fixture.feature)).join("\n")
+}

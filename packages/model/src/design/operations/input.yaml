@@ -1,0 +1,49 @@
+feature: Input
+background:
+  given: an editor
+examples:
+  - scenario: a typed letter lands in the block with the caret after it
+    before: |
+      For every | there is a δ.
+    when: input(For every ε| there is a δ.)
+    after: |
+      For every ε| there is a δ.
+
+  - scenario: text typed over a selection replaces it
+    before: |
+      A space is compact when every open cover has a {countable} subcover.
+    when: input(A space is compact when every open cover has a finite| subcover.)
+    after: |
+      A space is compact when every open cover has a finite| subcover.
+
+  - scenario: a letter composed from several keys arrives as one input
+    before: |
+      The Hausdorff condition separates points by |pen sets.
+    when: input(The Hausdorff condition separates points by ö|pen sets.)
+    after: |
+      The Hausdorff condition separates points by ö|pen sets.
+
+  - scenario: a character outside the basic plane keeps the caret after it
+    before: |
+      The reals | carry the order topology.
+    when: input(The reals 𝕽| carry the order topology.)
+    after: |
+      The reals 𝕽| carry the order topology.
+
+  - scenario: a replacement from autocorrect lands as one input
+    before: |
+      Every metric space is a Hausdorf| space.
+    when: input(Every metric space is a Hausdorff| space.)
+    after: |
+      Every metric space is a Hausdorff| space.
+
+  - scenario: an input touches only the block that holds the focus
+    before: |
+      @a A basis is a family of open sets.
+      @b Every open set is a union of |members.
+      @c The open balls form a basis of a metric space.
+    when: input(Every open set is a union of basis |members.)
+    after: |
+      @a A basis is a family of open sets.
+      @b Every open set is a union of basis |members.
+      @c The open balls form a basis of a metric space.

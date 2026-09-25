@@ -1,0 +1,62 @@
+var:
+  output: ../dist
+  favicon: >-
+    data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext x='16' y='25' text-anchor='middle' font-family='Helvetica,Arial,sans-serif' font-weight='bold' font-size='26' fill='%23000'%3Ee%3C/text%3E%3C/svg%3E
+  indexCurrent: ""
+  operationsCurrent: ""
+  indexToc: ""
+  operationsToc: ""
+  contents: |-
+    <aside class="contents" aria-label="Contents">
+      <a class="brand" href="./index.html">Editor</a>
+      <p class="contents__label">Contents</p>
+      <ol class="contents__pages">
+        <li><a href="./index.html"{{indexCurrent}}>The editor</a>{{indexToc}}</li>
+        <li><a href="./operations.html"{{operationsCurrent}}>Operations</a>{{operationsToc}}</li>
+      </ol>
+      <p class="contents__colophon">editor / 1926</p>
+    </aside>
+  shell: |-
+    <!doctype html>
+    <html lang="en">
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1">
+      <title>{{title}}</title>
+      <link rel="icon" href="{{favicon}}">
+      <link rel="preconnect" href="https://fonts.googleapis.com">
+      <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jost:ital,wght@0,300;0,400;0,500;0,700;1,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+      <link rel="stylesheet" href="./style.css">
+    </head>
+    <body>
+      {{contents}}
+      <main class="page">
+        <p class="running-head"><span>The editor</span><span>{{running}}</span></p>
+        <article class="prose" id="content">{{pageBody}}</article>
+        <p class="tailpiece" aria-hidden="true"></p>
+      </main>
+    </body>
+    </html>
+build:
+  - output: "{{output}}/index.html"
+    input: "{{shell}}"
+    var:
+      title: Editor
+      running: Model
+      pageBody: {file: pages/EDITOR.md, transform: docsMd}
+      indexToc: {file: pages/EDITOR.md, transform: docsToc}
+      indexCurrent: ' aria-current="page"'
+  - output: "{{output}}/operations.html"
+    input: "{{shell}}"
+    var:
+      title: Operations — Editor
+      running: Operations
+      joinOps: {file: ../../packages/model/src/design/operations/join.yaml, transform: operations}
+      splitOps: {file: ../../packages/model/src/design/operations/split.yaml, transform: operations}
+      inputOps: {file: ../../packages/model/src/design/operations/input.yaml, transform: operations}
+      pageBody: {file: pages/OPERATIONS.md, transform: docsMd}
+      operationsToc: {file: pages/OPERATIONS.md, transform: docsToc}
+      operationsCurrent: ' aria-current="page"'
+  - output: "{{output}}/style.css"
+    input: {copy: ../assets/style.css}

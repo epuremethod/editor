@@ -1,0 +1,25 @@
+{
+  "name": "@editor/model",
+  "version": "0.0.0",
+  "description": "The editor's model: blocks, runs, marks and the pure edits over them. No DOM.",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "res:build": "rescript",
+    "res:dev": "rescript watch",
+    "format": "rescript format",
+    "pretest": "pnpm res:build",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@epure/vitest": "2.0.0",
+    "@rescript/runtime": "^12.3.0",
+    "rescript": "^12.3.0",
+    "vitest": "^3.2.4"
+  },
+  "peerDependencies": {
+    "@rescript/runtime": "^12.3.0"
+  }
+}

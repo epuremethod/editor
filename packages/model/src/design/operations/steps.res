@@ -1,0 +1,69 @@
+open EpureVitest
+
+// One `given` for every operation fixture: the document before, the act, and
+// the document after, all three in the notation. Ids are compared only when
+// the `after` names one, so a scenario about identity says so by writing it.
+//
+// An act is a word, with its argument in parentheses: `backspace`, `enter`,
+// `input(For every ε| there is a δ.)`. Several acts make a list. The argument
+// of `input` is one block in the notation: the text the browser left in it
+// and the selection.
+
+type example = {before: string, @as("when") when_: JSON.t, after: string}
+
+let actLine = /^(\w+)(?:\((.*)\))?$/s
+
+// A new block takes the first letter no block holds, so an `after` written
+// without ids reads a split as `a` then `b`.
+let mint = (doc: Doc.t) => {
+  let taken = doc.blocks->Array.map(block => block.id)
+  let rec free = index => {
+    let id = Notation.letter(index)
+    taken->Array.includes(id) ? free(index + 1) : id
+  }
+  free(0)
+}
+
+let act = (doc: Doc.t, said: string) => {
+  let (name, argument) = switch actLine->RegExp.exec(said) {
+  | Some(found) =>
+    let matches = found->RegExp.Result.matches
+    (matches->Array.getUnsafe(0)->Option.getOr(""), matches->Array.get(1)->Option.flatMap(x => x))
+  | None => panic(`The act ${said} does not read as a word with an argument`)
+  }
+  switch (name, argument) {
+  | ("backspace", None) => Edit.deleteBackward(doc)
+  | ("enter", None) => Edit.split(doc, ~id=mint(doc))
+  | ("input", Some(block)) =>
+    let {doc: changed} = Notation.read(block)
+    switch (changed.blocks, changed.selection) {
+    | ([{content: {text}}], Some({anchor, focus})) =>
+      Edit.input(doc, ~text, ~anchor=anchor.offset, ~focus=focus.offset)
+    | ([_], None) => panic("The argument of input holds a caret or a selection")
+    | _ => panic("The argument of input is one block")
+    }
+  | ("input", None) => panic("input takes the block as the browser left it: input(For every ε| there is a δ.)")
+  | (other, _) => panic(`The act ${other} is not known`)
+  }
+}
+
+let acts = (when_: JSON.t) =>
+  switch when_ {
+  | String(one) => [one]
+  | Array(many) =>
+    many->Array.map(item =>
+      switch item {
+      | String(one) => one
+      | _ => panic("An act is a string")
+      }
+    )
+  | _ => panic("`when` is an act or a list of acts")
+  }
+
+given1("an editor", (_on, example: example) => {
+  let before = Notation.read(example.before)
+  let after = Notation.read(example.after)
+  let labels = after.labeled
+  let result = acts(example.when_)->Array.reduce(before.doc, act)
+  expect(Notation.write(result, ~labels)).toBe(Notation.write(after.doc, ~labels))
+})

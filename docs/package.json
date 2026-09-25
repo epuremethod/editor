@@ -1,0 +1,22 @@
+{
+  "name": "editor-docs",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "prebuild": "pnpm --filter @editor/model res:build",
+    "build": "node src/build.mjs",
+    "dev": "node src/dev.mjs",
+    "check": "pnpm build && node --test src/*.test.mjs",
+    "test": "pnpm check"
+  },
+  "dependencies": {
+    "@editor/model": "workspace:^",
+    "@epure/minidoc": "0.1.0",
+    "markdown-it": "14.3.0",
+    "markdown-it-anchor": "9.2.0",
+    "yaml": "2.9.0"
+  }
+}

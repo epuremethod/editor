@@ -1,0 +1,11 @@
+node_modules/
+.DS_Store
+
+# In-source ReScript output, rebuilt by "pnpm test".
+lib/
+*.res.mjs
+
+docs/dist/
+
+# Claude Code local permissions, one machine only.
+.claude/settings.local.json

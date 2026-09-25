@@ -1,0 +1,44 @@
+feature: Split
+background:
+  given: an editor
+examples:
+  - scenario: enter in the middle of a block splits it at the caret, removing space
+    before: |
+      A map f from X to Y is continuous when| the preimage of every open set is open.
+    when: enter
+    after: |
+      A map f from X to Y is continuous when
+      |the preimage of every open set is open.
+
+  - scenario: the first half keeps the id and the second half takes a new one
+    before: |
+      @a Continuity is a statement about| open sets, not about distances.
+    when: enter
+    after: |
+      @a Continuity is a statement about
+      @b |open sets, not about distances.
+
+  - scenario: enter at the end of a block opens an empty block under it
+    before: |
+      A homeomorphism is a continuous bijection with a continuous inverse.|
+    when: enter
+    after: |
+      A homeomorphism is a continuous bijection with a continuous inverse.
+      |
+
+  - scenario: enter at the start of a block opens an empty block above it
+    before: |
+      |Two spaces are homeomorphic when a homeomorphism runs between them.
+    when: enter
+    after: |
+
+      |Two spaces are homeomorphic when a homeomorphism runs between them.
+
+  - scenario: enter twice leaves an empty block between the halves
+    before: |
+      The circle and the square are homeomorphic.| The circle and the line are not.
+    when: [enter, enter]
+    after: |
+      The circle and the square are homeomorphic.
+
+      |The circle and the line are not.

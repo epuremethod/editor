@@ -1,0 +1,8 @@
+packages:
+  - packages/*
+  - docs
+
+minimumReleaseAgeExclude:
+  - "@epure/*"
+  - "@tilia/*"
+  - tilia
