@@ -60,6 +60,13 @@ body {
   text-decoration: none;
 }
 
+.brand__edition {
+  font-size: 0.5em;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  color: var(--grey);
+}
+
 .brand::after {
   content: "";
   display: block;
@@ -132,14 +139,25 @@ body {
 
 .contents__sections > li > a { grid-column: 2; }
 
+/* The colophon: the repository, the author and the credits, at the foot
+   of the contents. The links are its only black words. */
+
 .contents__colophon {
   margin: auto 0 0;
   padding-top: 2rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.35rem;
+  min-width: 0;
   font-size: 0.72rem;
   letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--grey);
 }
+
+.contents__colophon a { text-transform: none; letter-spacing: 0.05em; }
+
+.contents__credits { margin-top: 0.6rem; line-height: 1.6; }
 
 /* The page: everything hangs from the left edge. */
 
@@ -467,10 +485,10 @@ body {
 
 .tree__caret {
   display: inline-block;
-  width: 3px;
-  height: 1.1em;
+  width: 2px;
+  height: 1.4em;
   margin: 0 -1px;
-  vertical-align: -0.2em;
+  vertical-align: -0.3em;
   background: var(--red);
 }
 
@@ -523,7 +541,22 @@ body {
 
 .tree__type { font-family: var(--mono); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; }
 
-.tree__entry--open { color: var(--black); box-shadow: inset 2px 0 0 var(--red); padding-left: 0.4rem; }
+/* The open entry: a triangle points at it, so nothing beside its caret
+   looks like a caret. The caret in its source stays thin. */
+
+.tree__entry--open { color: var(--black); position: relative; }
+
+.tree__entry--open::before {
+  content: "";
+  position: absolute;
+  left: -0.9rem;
+  top: 0.3rem;
+  border-left: 0.4rem solid var(--red);
+  border-top: 0.3rem solid transparent;
+  border-bottom: 0.3rem solid transparent;
+}
+
+.tree__source .tree__caret { height: 1.3em; vertical-align: -0.28em; }
 
 /* The schema: a structure drawn as nested frames. A frame is a row, and a
    frame inside a frame hangs under it. The blocks of a section are drawn
@@ -703,7 +736,7 @@ body {
     padding: 1.6rem 1.25rem 1.2rem;
   }
   .brand { margin-bottom: 1.2rem; }
-  .contents__colophon { display: none; }
+  .contents__colophon { padding-top: 1.2rem; }
   .page { margin-left: 0; padding: 2rem 1.25rem 4rem; }
   .prose h1 { font-size: 3rem; }
   .op__grid { grid-template-columns: minmax(0, 1fr); }

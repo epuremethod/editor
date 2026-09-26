@@ -13,14 +13,25 @@ var:
   demoToc: ""
   contents: |-
     <aside class="contents" aria-label="Contents">
-      <a class="brand" href="./index.html">Editor</a>
+      <a class="brand" href="./index.html">editor <span class="brand__edition">/ 1926</span></a>
       <p class="contents__label">Contents</p>
       <ol class="contents__pages">
         <li><a href="./index.html"{{indexCurrent}}>The editor</a>{{indexToc}}</li>
         <li><a href="./demo.html"{{demoCurrent}}>Demo</a>{{demoToc}}</li>
         <li><a href="./operations.html"{{operationsCurrent}}>Operations</a>{{operationsToc}}</li>
       </ol>
-      <p class="contents__colophon">editor / 1926</p>
+      <footer class="contents__colophon">
+        <a href="https://github.com/epuremethod/editor">github.com/epuremethod/editor</a>
+        <span>by Gaspard Anna Bucher</span>
+        <span class="contents__credits">built with
+          <a href="https://tiliajs.dev">tilia</a>,
+          <a href="https://rescript-lang.org">ReScript</a>,
+          <a href="https://react.dev">React</a>,
+          <a href="https://katex.org">KaTeX</a>,
+          <a href="https://vitest.dev">Vitest</a> and the
+          <a href="https://epurejs.dev">épure method</a>
+        </span>
+      </footer>
     </aside>
   shell: |-
     <!doctype html>

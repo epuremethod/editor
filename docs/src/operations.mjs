@@ -81,10 +81,13 @@ const covering = (marks, at) => marks.filter(mark => mark.start <= at && at < ma
 const sameSet = (a, b) => a.length === b.length && a.every(kind => b.some(other => name(other) === name(kind)))
 
 // The caret, with the marks it holds when they are worth showing: at a mark
-// boundary, or when they differ from the character before it.
+// boundary, or when they differ from the character before it. An atom is
+// never entered, so its edges are not a boundary and it holds no mark.
+const enterable = marks => marks.filter(mark => name(mark.kind) !== "Ref")
 function caretHtml(content, at, pending) {
-  const before = at > 0 ? covering(content.marks, at - 1).map(mark => mark.kind) : []
-  const boundary = content.marks.some(mark => mark.start === at || mark.stop === at)
+  const marks = enterable(content.marks)
+  const before = at > 0 ? covering(marks, at - 1).map(mark => mark.kind) : []
+  const boundary = marks.some(mark => mark.start === at || mark.stop === at)
   const shown = boundary || !sameSet(pending, before)
   const label = pending.length ? pending.map(kind => initial[name(kind)]).join("") : "–"
   return `<span class="tree__caret"></span>${shown ? `<span class="tree__pending">${label}</span>` : ""}`
