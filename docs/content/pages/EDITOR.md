@@ -25,30 +25,53 @@ sections, because a row may hang under a row of the same class.
 
 A **section** is a row, and it is the unit of everything social. It is what a
 person shares, drafts, proposes or transcludes. It is also the smallest thing
-lapa syncs, merges and reaches on its own. A section keeps its content in one
-field. The definition of a topology with its three axioms is a section. The
-proof of a theorem is a section. A section has no heading level and no
-nesting. Its heading, when it has one, is a block inside it.
+lapa syncs, merges and reaches on its own. A section keeps its blocks in one
+field and its entries in another. The definition of a topology with its three
+axioms is a section. The proof of a theorem is a section. A section has no
+heading level and no nesting. Its heading, when it has one, is a block inside
+it.
 
-A **block** is one entry of that field: an id and a content. It is the
+A **block** is one element of the first field: an id and a content. It is the
 smallest thing the editor renders, and the thing the Operations page draws one
 line for. A block has a form. A **paragraph** holds prose. A **heading** holds
-a title at one of three levels. An **item** is one entry of a list. A
-**formula** holds a LaTeX display. An **embed** holds no text. It names a row
-that hangs under the section, and that row draws itself. A video block is an
-embed whose row is a Video, and a quiz block is an embed whose row is a Quiz.
-Paragraph is the everyday word for the common block. The model says block.
-The form is the line's prefix on the port, `# ` or `- `, and is not text in
-the model: offsets count from the first letter.
+a title at one of three levels. An **item** is one line of a list. A
+**display** holds one reference alone and draws it as a block: a formula on
+its own line, a video, a quiz. Paragraph is the everyday word for the common
+block. The model says block. The form is the line's prefix on the port, `# `
+or `- `, and is not text in the model: offsets count from the first letter.
 
-The content of a text block is **runs**: plain text and a list of **marks**. A
+The content of a block is **runs**: plain text and a list of **marks**. A
 mark is a kind, such as bold, italic, code or link, over a span of the plain
 text, counted in characters. The **caret** and the **selection** are offsets
 in the same plain text, so they map onto the rendered text one to one.
 
-The field that holds the blocks is a **keyed array**: an ordered list of
-entries, each keyed by its id. The order is the array. An id never moves from
-one content to another.
+An **entry** is one element of the second field: a type and a text. A formula
+is an entry of type math, and its text is the LaTeX source. A video is an
+entry of type video, and its text names the row and its placement. The
+**entries** of a section are a dictionary keyed by id, and the editor mints
+those ids as it mints a block's. A **type** is what the host knows about an
+entry: how to draw it, and how to merge two copies of it. The core knows no
+type.
+
+A **reference** is how a block holds an entry: `{{`a8f1`}}`, the id between
+double braces, as characters of the plain text under a mark of its own. A
+reference inside a sentence is inline. A reference alone in a display block
+is a block. The entry is the same in both, and its text never sits in the
+block.
+
+An **atom** is what a reference draws: one piece the browser may not edit,
+the entry rendered by its type for its place, inline or display. The caret
+sits before or after an atom, never inside. The text of an entry is edited in
+a box the editor opens under its atom.
+
+**Expansion** is for later. A type may answer a reference with more text to
+read, so that a template names other entries, and a letter or a résumé is
+written from one. The word is settled here, and nothing on this page uses it
+yet.
+
+The field that holds the blocks is a **keyed array**: an ordered list, each
+element keyed by its id. The order is the array. An id never moves from one
+content to another.
 
 ```schema A chapter, one of its sections, and what the section holds
 Document Chapter 2, topological spaces
@@ -133,16 +156,21 @@ Section Compactness
 ## Merge
 
 Lapa merges a record three ways against the base it keeps. A plain field
-takes the newer stamp. A text field runs diff3, so two edits to different
-places in one paragraph both land, and two edits to the same place surface as
-a conflict with markers a person or an AI can read. The keyed array is the
-third way, and it is the one piece of merge work this editor asks of lapa.
+takes the newer stamp, and two edits to one field conflict whole. This is
+the only way built today. A text field will run diff3, so two edits to
+different places in one paragraph both land, and two edits to the same place
+surface as a conflict with markers a person or an AI can read. The keyed
+array is the third way. The last two are the merge work this editor asks of
+lapa.
 
-A keyed array merges as a sequence of ids first, and as texts second. Diff3
-over the two sequences of ids against the base settles what was inserted,
-deleted and moved. Then every id edited on both sides runs diff3 on its text.
-An embed's dictionary merges field by field, like any record. So a conflict
-lands on one block, not on the section, and the view can show it in place.
+A keyed array merges entry by entry first, and as texts second. Against the
+base, every entry outside the longest run still in base order has moved, and
+each side's moves are played after the entry before them. Then every id
+whose text changed on both sides runs diff3 over its words, with git markers
+where both sides changed one stretch. The entries of a section are a second
+keyed array and merge the same way. So a conflict lands on one block or one
+entry, not on the section, and the view can show it in place. How a block
+draws the markers it received is still open.
 
 The shapes to name are few. Edited here and deleted there is a conflict.
 Moved here and moved there is a conflict. Inserted at the same gap by both is
@@ -220,10 +248,15 @@ produces no merge noise once it has been through unpack and pack once.
 The browser is an input device, not the model. A section renders into one
 contentEditable root, one paragraph per block, keyed by the block's id. A
 paragraph holds exactly the plain text of its block, wrapped in the tags its
-marks call for and nothing else: no marker characters and no zero-width
-spaces. That keeps the offset map one to one. The browser edits text inside
-a paragraph and is allowed nothing beyond that; every change of structure is
-the model's.
+marks call for and nothing else: no marker characters. That keeps the offset
+map one to one. An atom is the one exception, and it keeps the map by a
+rule: the element that draws an entry counts as the characters of its
+reference, whatever it shows, and the caret sits before or after it. Chrome
+holds no caret beside an atom at the edge of a block unless a text node
+stands there, so a zero-width space is written on each side of an atom, and
+the bindings count it as nothing. The browser edits text inside a paragraph
+and is allowed nothing beyond that; every change of structure is the
+model's.
 
 Every input announces itself as a `beforeinput` event with a type, and the
 type decides who edits. A structural type is prevented and applied to the
@@ -388,6 +421,10 @@ content is fields of its class.
 
 ## Open
 
+A conflicted block. The merge writes git markers inside one text, which is
+one line on the port, and the editor has no rule yet for drawing a block
+that holds them.
+
 Bullet points. Where a list is one paragraph block and where each item is its
 own block. The previous answer was to split into blocks past ten items.
 
@@ -412,8 +449,9 @@ received under it. Eighty-two of the cards run in Chrome through the same
 fixtures; six are skipped because no key drives them. Composition is wired
 and untested, and Safari and Firefox are untouched.
 
-`@lapa/editor` does not exist. Nothing on the rows and reach pages is built,
-and the keyed array's sequence merge is still to write in `@lapa/db`.
+`@lapa/editor` does not exist. Nothing on the rows and reach pages is built.
+`@lapa/db` merges a record field by field; diff3 on a text field and the
+keyed array's sequence merge are still to write there.
 
 | Stage | State |
 | --- | --- |
@@ -425,7 +463,7 @@ and the keyed array's sequence merge is still to write in `@lapa/db`.
 | Undo | not started |
 | Block forms: headings and items | done |
 | Formulas and embeds | not started |
-| Lapa: the sequence merge, rows through the port | not started |
+| Lapa: text diff3, the sequence merge, rows through the port | not started |
 
 ## Order of work
 

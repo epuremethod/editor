@@ -5,9 +5,12 @@ open Course
 
 let state = View.prepare(section)
 let mint = mint(state)
+let mintEntry = mintEntry(state)
 
 ReactDOM.querySelector("#demo-editor")->Option.forEach(root =>
-  ReactDOM.Client.createRoot(root)->ReactDOM.Client.Root.render(<View state section storage mint />)
+  ReactDOM.Client.createRoot(root)->ReactDOM.Client.Root.render(
+    <View state section storage mint mintEntry types />,
+  )
 )
 
 ReactDOM.querySelector("#demo-port")->Option.forEach(root =>

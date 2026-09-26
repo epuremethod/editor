@@ -1,8 +1,12 @@
 // The `operations` transform: a YAML fixture of `@epure/vitest`, rendered as
 // one card per scenario. Each card draws the document before the act and the
 // document after it, read with the model's own notation reader, so the page
-// shows exactly what the test reads.
+// shows exactly what the test reads. The transform takes the fixture's name
+// and reads the file itself: a fixture is a contract, and the double braces
+// of a reference in it are not minidoc's variables.
 
+import {readFileSync} from "node:fs"
+import katex from "katex"
 import {parse} from "yaml"
 import {read} from "@epure/editor/src/domain/feature/Notation.res.mjs"
 import {slugify} from "./markdown.mjs"
@@ -37,12 +41,28 @@ function within(doc, block) {
   }
 }
 
-// A mark's kind, as the model compiles it: a string, or a link with its href.
-const rank = {Link: 0, Bold: 1, Italic: 2, Code: 3}
-const name = kind => (typeof kind === "string" ? kind : "Link")
+// A mark's kind, as the model compiles it: a string, or a link with its
+// href, or a reference with its id.
+const rank = {Link: 0, Bold: 1, Italic: 2, Code: 3, Ref: 4}
+const name = kind => (typeof kind === "string" ? kind : kind.TAG)
 const initial = {Bold: "B", Italic: "I", Code: "`", Link: "K"}
 
-function wrap(mark, inner) {
+// An atom, drawn the way the editor draws it: a formula through KaTeX,
+// inline or in display mode by its block's form, any other type as its
+// source, and a reference to no entry as itself. The card shows what the
+// person sees, never the source in the line.
+function atom(id, entries, display) {
+  const entry = entries[id]
+  const inner =
+    entry === undefined
+      ? `<span class="tree__missing">${escape(`{{${id}}}`)}</span>`
+      : entry.type === "math"
+        ? katex.renderToString(entry.text.replace("|", ""), {displayMode: display, throwOnError: false})
+        : `<span class="tree__source">${escape(entry.text.replace("|", ""))}</span>`
+  return `<span class="tree__atom${display ? " tree__atom--display" : ""}">${inner}</span>`
+}
+
+function wrap(mark, inner, {entries, display}) {
   switch (name(mark.kind)) {
     case "Bold":
       return `<strong>${inner}</strong>`
@@ -50,6 +70,8 @@ function wrap(mark, inner) {
       return `<em>${inner}</em>`
     case "Code":
       return `<code>${inner}</code>`
+    case "Ref":
+      return atom(mark.kind._0, entries, display)
     default:
       return `<a href="${escape(mark.kind._0)}">${inner}</a>`
   }
@@ -68,8 +90,9 @@ function caretHtml(content, at, pending) {
   return `<span class="tree__caret"></span>${shown ? `<span class="tree__pending">${label}</span>` : ""}`
 }
 
-function text(doc, block) {
+function text(doc, block, entries = {}) {
   const content = block.content
+  const context = {entries, display: block.form === "Display"}
   const {caret, pending, range} = within(doc, block)
   const cuts = new Set([0, content.text.length])
   content.marks.forEach(mark => cuts.add(mark.start).add(mark.stop))
@@ -84,7 +107,7 @@ function text(doc, block) {
     const next = offsets[index + 1]
     if (next === undefined) return
     const marks = covering(content.marks, at).sort((a, b) => rank[name(b.kind)] - rank[name(a.kind)])
-    html += marks.reduce((inner, mark) => wrap(mark, inner), escape(content.text.slice(at, next)))
+    html += marks.reduce((inner, mark) => wrap(mark, inner, context), escape(content.text.slice(at, next)))
   })
   return html
 }
@@ -93,18 +116,35 @@ function text(doc, block) {
 function lead(block) {
   const form = block.form
   if (form === "Item") return '<span class="tree__form">- </span>'
+  if (form === "Display") return '<span class="tree__form">:: </span>'
   if (typeof form === "object") return `<span class="tree__form">${"#".repeat(form._0)} </span>`
   return ""
 }
 
-function tree(doc) {
+// The entries under a document: id, type and source. A pipe in a source is
+// the box's caret, drawn as the caret is drawn in a block.
+function sourceHtml(text) {
+  const at = text.indexOf("|")
+  if (at === -1) return escape(text)
+  return `${escape(text.slice(0, at))}<span class="tree__caret"></span>${escape(text.slice(at + 1))}`
+}
+
+function listed(entries) {
+  const rows = Object.entries(entries ?? {}).map(
+    ([id, entry]) =>
+      `<div class="tree__entry${entry.text.includes("|") ? " tree__entry--open" : ""}"><span class="tree__id">${escape(id)}</span><span class="tree__type">${escape(entry.type)}</span><span class="tree__source">${sourceHtml(entry.text)}</span></div>`,
+  )
+  return rows.length ? `<div class="tree__entries">${rows.join("")}</div>` : ""
+}
+
+function tree(doc, entries) {
   const blocks = doc.blocks
     .map(
       block =>
-        `<li class="tree__block"><span class="tree__id">${escape(block.id)}</span><span class="tree__text${typeof block.form === "object" ? " tree__text--heading" : ""}">${lead(block)}${text(doc, block) || '<span class="tree__empty">—</span>'}</span></li>`,
+        `<li class="tree__block"><span class="tree__id">${escape(block.id)}</span><span class="tree__text${typeof block.form === "object" ? " tree__text--heading" : ""}">${lead(block)}${text(doc, block, entries) || '<span class="tree__empty">—</span>'}</span></li>`,
     )
     .join("")
-  return `<ol class="tree">${blocks}</ol>`
+  return `<ol class="tree">${blocks}</ol>${listed(entries)}`
 }
 
 // The argument of `input`, plain text with its caret, drawn the way a block
@@ -114,10 +154,11 @@ function line(source) {
   return doc.blocks.map(block => text(doc, block)).join("")
 }
 
-// The argument of `paste`, a document in the notation, drawn one block a line.
-function lines(source) {
+// The argument of `paste`, a document in the notation, drawn one block a
+// line, its references drawn from the entries the section holds.
+function lines(source, entries) {
   const {doc} = read(source)
-  return doc.blocks.map(block => text(doc, block)).join("\n")
+  return doc.blocks.map(block => text(doc, block, entries)).join("\n")
 }
 
 const actLine = /^(\w+|->|<-)(?:\((.*)\))?$/s
@@ -149,6 +190,10 @@ const keys = {
   heading: "H",
   paragraph: "P",
   item: "•",
+  display: "⌥4",
+  insert: "⌘M",
+  edit: "⌖",
+  escape: "⎋",
 }
 
 function sign(name) {
@@ -164,12 +209,12 @@ function acts(when) {
     .join("")
 }
 
-function arguments_(when) {
+function arguments_(when, entries) {
   const rows = parsed(when).map(({name, argument}) => {
     const shown =
       argument === undefined
         ? ""
-        : `<span class="op__argument-text">${name === "input" ? line(argument) : name === "paste" ? lines(argument) : escape(argument)}</span>`
+        : `<span class="op__argument-text">${name === "input" ? line(argument) : name === "paste" ? lines(argument, entries) : escape(argument)}</span>`
     return `<div class="op__argument"><kbd class="op__act-name">${escape(name)}</kbd>${shown}</div>`
   })
   return `<div class="op__arguments">${rows.join("")}</div>`
@@ -183,20 +228,25 @@ function card(example, feature) {
   }
   const before = read(example.before).doc
   const after = read(example.after).doc
+  const entries = example.entries ?? {}
+  const entriesAfter = example.entriesAfter ?? entries
   return [
     `<figure class="op" id="${slugify(example.scenario)}">`,
     `<figcaption class="op__head"><span class="op__title">${escape(example.scenario)}</span><span class="op__feature">${escape(feature)}</span></figcaption>`,
     '<div class="op__grid">',
-    `<section class="op__side op__side--before"><p class="op__label">Before</p>${tree(before)}</section>`,
+    `<section class="op__side op__side--before"><p class="op__label">Before</p>${tree(before, entries)}</section>`,
     `<div class="op__act">${acts(example.when)}</div>`,
-    `<section class="op__side op__side--after"><p class="op__label">After</p>${tree(after)}</section>`,
+    `<section class="op__side op__side--after"><p class="op__label">After</p>${tree(after, entriesAfter)}</section>`,
     "</div>",
-    arguments_(example.when),
+    arguments_(example.when, entries),
     "</figure>",
   ].join("")
 }
 
-export function operations(source) {
+const fixtures = new URL("../../packages/editor/src/design/operations/", import.meta.url)
+
+export function operations(name) {
+  const source = readFileSync(new URL(`${name.trim()}.yaml`, fixtures), "utf8")
   const fixture = parse(source)
   if (!fixture || typeof fixture.feature !== "string" || !Array.isArray(fixture.examples)) {
     throw new Error("An operations fixture holds a feature and its examples")

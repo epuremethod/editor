@@ -1,0 +1,137 @@
+feature: Display
+background:
+  given: an editor
+examples:
+  - scenario: display turns a block holding one reference alone into a display block
+    entries:
+      a8f1: {type: math, text: '\emptyset \in \tau \quad\text{and}\quad X \in \tau'}
+    before: |
+      Two sets are always open:
+      {{a8f1}}|
+    when: display
+    after: |
+      Two sets are always open:
+      :: {{a8f1}}|
+
+  - scenario: display on a block holding text beside its reference changes nothing
+    entries:
+      a8f1: {type: math, text: '\emptyset \in \tau \quad\text{and}\quad X \in \tau'}
+    before: |
+      Two sets are always open: {{a8f1}}|
+    when: display
+    after: |
+      Two sets are always open: {{a8f1}}|
+
+  - scenario: paragraph turns a display block back into a paragraph
+    entries:
+      a8f1: {type: math, text: '\emptyset \in \tau \quad\text{and}\quad X \in \tau'}
+    before: |
+      :: {{a8f1}}|
+    when: paragraph
+    after: |
+      {{a8f1}}|
+
+  - scenario: a display formula under a paragraph is an enter, an insert and the form
+    entries:
+      a8f1: {type: math, text: '\emptyset \in \tau \quad\text{and}\quad X \in \tau'}
+    before: |
+      Two sets are always open:|
+    when: [enter, 'insert(math, \emptyset \in \tau)', display]
+    after: |
+      Two sets are always open:
+      :: {{e1}}|
+    entriesAfter:
+      a8f1: {type: math, text: '\emptyset \in \tau \quad\text{and}\quad X \in \tau'}
+      e1: {type: math, text: '\emptyset \in \tau'}
+
+  - scenario: a letter typed beside the atom makes the block a paragraph again
+    entries:
+      a8f1: {type: math, text: '\emptyset \in \tau \quad\text{and}\quad X \in \tau'}
+    before: |
+      :: {{a8f1}}|
+    when: "input({{a8f1}} holds|)"
+    after: |
+      {{a8f1}} holds|
+
+  - scenario: right from the paragraph above enters the display block before its atom
+    entries:
+      a8f1: {type: math, text: '\emptyset \in \tau \quad\text{and}\quad X \in \tau'}
+    before: |
+      Two sets are always open:|
+      :: {{a8f1}}
+    when: ->
+    after: |
+      Two sets are always open:
+      :: |{{a8f1}}
+
+  - scenario: right again enters the display's box
+    entries:
+      a8f1: {type: math, text: '\emptyset \in \tau \quad\text{and}\quad X \in \tau'}
+    before: |
+      Two sets are always open:|
+      :: {{a8f1}}
+    when: [->, ->]
+    after: |
+      Two sets are always open:
+      :: |{{a8f1}}
+    entriesAfter:
+      a8f1: {type: math, text: '|\emptyset \in \tau \quad\text{and}\quad X \in \tau'}
+
+  - scenario: backspace at the start of a display block joins it to the paragraph above, inline
+    entries:
+      a8f1: {type: math, text: '\emptyset \in \tau \quad\text{and}\quad X \in \tau'}
+    before: |
+      Two sets are always open:
+      :: |{{a8f1}}
+    when: backspace
+    after: |
+      Two sets are always open: |{{a8f1}}
+
+  - scenario: backspace after the atom selects it
+    entries:
+      a8f1: {type: math, text: '\emptyset \in \tau \quad\text{and}\quad X \in \tau'}
+    before: |
+      :: {{a8f1}}|
+    when: backspace
+    after: |
+      :: {{{a8f1}}}
+
+  - scenario: backspace over the selected atom leaves an empty paragraph
+    entries:
+      a8f1: {type: math, text: '\emptyset \in \tau \quad\text{and}\quad X \in \tau'}
+    before: |
+      :: {{{a8f1}}}
+    when: backspace
+    after: |
+      |
+
+  - scenario: enter at the end of a display block opens a paragraph under it
+    entries:
+      a8f1: {type: math, text: '\emptyset \in \tau \quad\text{and}\quad X \in \tau'}
+    before: |
+      :: {{a8f1}}|
+    when: enter
+    after: |
+      :: {{a8f1}}
+      |
+
+  - scenario: enter at the start of a display block opens a paragraph above it
+    entries:
+      a8f1: {type: math, text: '\emptyset \in \tau \quad\text{and}\quad X \in \tau'}
+    before: |
+      :: |{{a8f1}}
+    when: enter
+    after: |
+
+      :: |{{a8f1}}
+
+  - scenario: the same entry draws inline in one block and as a display block in another
+    entries:
+      a8f1: {type: math, text: '\emptyset \in \tau \quad\text{and}\quad X \in \tau'}
+    before: |
+      The pair {{a8f1}} is the first axiom.|
+      :: {{a8f1}}
+    when: ->
+    after: |
+      The pair {{a8f1}} is the first axiom.
+      :: |{{a8f1}}

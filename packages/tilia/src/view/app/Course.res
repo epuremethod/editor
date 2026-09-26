@@ -46,8 +46,56 @@ let section: Section.t = {
       "o",
       "See [compactness](/compactness) for what a finite subcover buys, and `U` for a typical open set.",
     ),
+    (
+      "p",
+      "A formula is an entry: {{f1}} sits inline, and the same kind of entry alone in a block is a display. Click one to edit its source. Cmd+M inserts a new one, and Cmd+Alt+4 makes a block holding one a display.",
+    ),
+    ("q", ":: {{f2}}"),
+  ],
+  entries: [
+    ("f1", "math\nU \\in \\tau"),
+    (
+      "f2",
+      "math\n\\bigcup_{i \\in I} U_i \\in \\tau \\quad\\text{for every family } (U_i)_{i \\in I} \\subseteq \\tau",
+    ),
   ],
 }
+
+// The types the demo knows. A formula draws through KaTeX, inline or in
+// display mode by its place, and enters the editor's box. A video draws
+// its placement and opens a widget of its own on a click: here a plain
+// field over its JSON, since the demo has no player.
+type katexOptions = {displayMode: bool, throwOnError: bool}
+@module("katex") external renderToString: (string, katexOptions) => string = "renderToString"
+
+let math: View.render = (entry, ~display) =>
+  <span
+    className="math"
+    dangerouslySetInnerHTML={{
+      "__html": renderToString(entry.text, {displayMode: display, throwOnError: false}),
+    }}
+  />
+
+let video: View.render = (entry, ~display as _) =>
+  <span className="video"> {React.string("▶ " ++ entry.text)} </span>
+
+let videoWidget: View.widget = (~entry, ~onChange, ~onClose) =>
+  <textarea
+    className="widget__source"
+    defaultValue=entry.text
+    rows=2
+    onChange={event => onChange(ReactEvent.Form.target(event)["value"])}
+    onKeyDown={event =>
+      if ReactEvent.Keyboard.key(event) == "Escape" {
+        onClose()
+      }}
+    onBlur={_ => onClose()}
+  />
+
+let types: dict<View.spec> = Dict.fromArray([
+  ("math", {View.render: math}),
+  ("video", {render: video, widget: videoWidget}),
+])
 
 let shown = Tilia.tilia({last: ""})
 
@@ -83,4 +131,14 @@ let mint = (state: View.state) =>
       taken->Array.includes(id) ? free(index + 1) : id
     }
     free(0)
+  }
+
+// The id a new entry takes: `e1`, `e2` and on, the way the harness mints.
+let mintEntry = (state: View.state) =>
+  () => {
+    let rec free = n => {
+      let id = `e${Int.toString(n)}`
+      state.doc.entries->Dict.has(id) ? free(n + 1) : id
+    }
+    free(1)
   }

@@ -497,6 +497,34 @@ body {
   box-shadow: inset 0 -2px 0 var(--red);
 }
 
+/* An atom on a card: the entry drawn by its type, as the editor draws it.
+   The entries of the scenario sit under the tree. */
+
+.tree__atom { display: inline-block; padding: 0 0.1em; border-radius: 2px; box-shadow: inset 0 0 0 1px var(--grey-light); }
+
+.tree__atom--display { display: block; text-align: center; padding: 0.4rem 0; }
+
+.tree__missing { font-family: var(--mono); font-size: 0.85em; color: var(--red); }
+
+.tree__source { font-family: var(--mono); font-size: 0.85em; white-space: pre-wrap; }
+
+.tree__entries { margin: 0.6rem 0 0; display: grid; gap: 0.3rem; }
+
+.tree__entry {
+  display: grid;
+  grid-template-columns: 1.5rem auto minmax(0, 1fr);
+  gap: 0.6rem;
+  align-items: baseline;
+  font-size: 0.85rem;
+  color: var(--grey);
+}
+
+.tree__entry .tree__id { font-size: 0.75rem; line-height: 1.2rem; color: var(--grey); }
+
+.tree__type { font-family: var(--mono); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; }
+
+.tree__entry--open { color: var(--black); box-shadow: inset 2px 0 0 var(--red); padding-left: 0.4rem; }
+
 /* The schema: a structure drawn as nested frames. A frame is a row, and a
    frame inside a frame hangs under it. The blocks of a section are drawn
    the way a plate draws them, so a row and an entry never look alike. */
@@ -652,6 +680,19 @@ body {
 .prose .editor h1, .prose .editor h2, .prose .editor h3, .prose .editor li { min-height: 1em; }
 
 .prose #demo-port { min-height: 3rem; }
+
+/* An atom draws an entry and is never edited in place; a click opens the
+   box under it, where its source is edited as text. */
+
+.prose .editor .atom { display: inline-block; cursor: pointer; border-radius: 2px; }
+.prose .editor .atom:hover { background: var(--faint); }
+.prose .editor .atom:empty, .prose .editor .atom .math:empty { min-width: 1em; min-height: 1em; }
+.prose .editor .atom--display { display: block; text-align: center; padding: 0.5rem 0; }
+.prose .editor .atom__missing { font-family: "IBM Plex Mono", monospace; font-size: 0.85em; color: var(--red); }
+.prose .editor .source { font-family: "IBM Plex Mono", monospace; font-size: 0.85em; }
+
+.box { z-index: 10; background: #fff; border: 2px solid var(--black); box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12); padding: 0.4rem; }
+.box__source { display: block; width: 24rem; max-width: 80vw; min-height: 1.6em; font-family: "IBM Plex Mono", monospace; font-size: 0.85rem; border: none; outline: none; resize: vertical; }
 
 @media (max-width: 58rem) {
   .contents {

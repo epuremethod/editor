@@ -18,6 +18,10 @@ type entry = {mutable kind: Doc.kind, start: int}
 
 let fail = message => panic(`Inline: ${message}`)
 
+// A reference: an id between double braces. Read before the markers, so
+// `{{{a}}}` is a selected reference.
+let reference = /^\{\{([A-Za-z0-9_-]+)\}\}/
+
 let read = (source: string, ~notation=true): read => {
   let text = ref("")
   let stack: array<entry> = []
@@ -53,6 +57,15 @@ let read = (source: string, ~notation=true): read => {
       }
       literal(peek(1))
       index := index.contents + 2
+    | "{" if !inCode() && reference->RegExp.test(source->String.slice(~start=index.contents)) =>
+      let found =
+        reference->RegExp.exec(source->String.slice(~start=index.contents))->Option.getUnsafe
+      let id = found->RegExp.Result.matches->Array.getUnsafe(0)->Option.getOr("")
+      let whole = found->RegExp.Result.fullMatch
+      open_(Ref(id))
+      literal(whole)
+      close()->ignore
+      index := index.contents + whole->String.length
     | "|" | "{" | "}" if notation =>
       let marker = switch character {
       | "|" => Caret
@@ -142,16 +155,20 @@ let read = (source: string, ~notation=true): read => {
 
 // The characters a text keeps literal with a backslash: the delimiters, and
 // in the notation the markers too. Inside a code span only the markers need
-// it, since a delimiter there is text.
-let escape = (text: string, ~code, ~notation) => {
-  let pattern = switch (code, notation) {
-  | (true, true) => /[|{}]/g
+// it, since a delimiter there is text. On the port a double brace that is
+// no reference takes a backslash on its first brace. A reference's text is
+// written as it is.
+let escape = (text: string, ~code, ~ref, ~notation) => {
+  let pattern = switch (ref, code, notation) {
+  | (true, _, _) => /(?!)/g
 
-  | (true, false) => /(?!)/g
+  | (_, true, true) => /[|{}]/g
 
-  | (false, true) => /[\\|{}*_`\[\]]/g
+  | (_, true, false) => /(?!)/g
 
-  | (false, false) => /[\\*_`\[\]]/g
+  | (_, false, true) => /[\\|{}*_`\[\]]/g
+
+  | (_, false, false) => /[\\*_`\[\]]|\{(?=\{)/g
   }
   text->String.replaceRegExp(pattern, "\\$&")
 }
@@ -164,6 +181,7 @@ let opening = (kind: Doc.kind) =>
   | Italic => "_"
   | Code => "`"
   | Link(_) => "["
+  | Ref(_) => ""
   }
 
 let closing = (kind: Doc.kind) =>
@@ -172,6 +190,7 @@ let closing = (kind: Doc.kind) =>
   | Italic => "_"
   | Code => "`"
   | Link(href) => `](${escapeHref(href)})`
+  | Ref(_) => ""
   }
 
 // A marker to write: the caret with the marks it holds, or one end of a
@@ -257,6 +276,7 @@ let write = (content: Doc.text, ~points: array<point>=[], ~notation=true): strin
         escape(
           text->String.slice(~start=offset, ~end=next),
           ~code=Runs.has(target, Code),
+          ~ref=target->Array.some(Runs.isRef),
           ~notation,
         ),
       )

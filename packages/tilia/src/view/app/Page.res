@@ -6,16 +6,32 @@ open Course
 
 let state = View.prepare(section)
 let mint = mint(state)
+let mintEntry = mintEntry(state)
 
-// The hook a browser test drives: load a document in the notation, read it
-// back in the notation.
-type hook = {load: string => unit, notation: bool => string}
+// The hook a browser test drives: load a document in the notation with its
+// entries, read it back in the notation, and read its entries.
+type hook = {
+  load: (string, Nullable.t<dict<Doc.entry>>, Nullable.t<Doc.editing>) => unit,
+  notation: bool => string,
+  entries: unit => dict<Doc.entry>,
+  editing: unit => Nullable.t<Doc.editing>,
+}
 @set external expose: (Dom.window, hook) => unit = "editor"
 @val external window: Dom.window = "window"
 
 window->expose({
-  load: source => View.load(state, Notation.read(source).doc),
+  load: (source, entries, editing) =>
+    View.load(
+      state,
+      {
+        ...Notation.read(source).doc,
+        entries: entries->Nullable.toOption->Option.getOr(Dict.make()),
+        editing: editing->Nullable.toOption,
+      },
+    ),
   notation: labels => Notation.write(state.doc, ~labels),
+  entries: () => state.doc.entries,
+  editing: () => state.doc.editing->Nullable.fromOption,
 })
 
 module App = {
@@ -23,7 +39,7 @@ module App = {
   let make = () =>
     <main>
       <h1> {React.string("open sets")} </h1>
-      <View state section storage mint />
+      <View state section storage mint mintEntry types />
       <p className="label"> {React.string("what the port received")} </p>
       <pre className="port" id="port">
         <Received />
@@ -41,6 +57,17 @@ let style = `
   .editor p { margin: 0 0 1rem; min-height: 1.5em; }
   .editor code { font-family: "IBM Plex Mono", monospace; font-size: 0.85em; background: var(--faint); padding: 0.05em 0.3em; }
   .editor a { color: var(--black); text-decoration: underline; text-decoration-color: var(--red); text-decoration-thickness: 2px; }
+  .atom { display: inline-block; cursor: pointer; border-radius: 2px; }
+  .atom:hover { background: var(--faint); }
+  .atom:empty, .atom .math:empty { min-width: 1em; min-height: 1em; }
+  .atom--display { display: block; text-align: center; padding: 0.5rem 0; }
+  .atom__missing { font-family: "IBM Plex Mono", monospace; font-size: 0.85em; color: var(--red); }
+  .source { font-family: "IBM Plex Mono", monospace; font-size: 0.85em; }
+  .box { z-index: 10; background: #fff; border: 2px solid var(--black); box-shadow: 0 4px 16px rgba(0,0,0,0.12); padding: 0.4rem; }
+  .box__source { display: block; width: 24rem; min-height: 1.6em; font-family: "IBM Plex Mono", monospace; font-size: 0.85rem; border: none; outline: none; resize: vertical; }
+  .widget { z-index: 10; background: #fff; border: 2px solid var(--red); box-shadow: 0 4px 16px rgba(0,0,0,0.12); padding: 0.4rem; }
+  .widget__source { display: block; width: 24rem; font-family: "IBM Plex Mono", monospace; font-size: 0.85rem; border: none; outline: none; }
+  .video { font-family: "IBM Plex Mono", monospace; font-size: 0.85em; background: var(--faint); padding: 0.05em 0.3em; }
   .label { margin: 3rem 0 0.5rem; font-size: 0.72rem; font-weight: 500; letter-spacing: 0.3em; text-transform: uppercase; color: var(--grey); }
   .port { margin: 0; padding: 1rem 1.2rem; background: var(--faint); font-family: "IBM Plex Mono", monospace; font-size: 0.8rem; white-space: pre-wrap; min-height: 3rem; }
 `

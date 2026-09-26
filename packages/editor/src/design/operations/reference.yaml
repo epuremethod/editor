@@ -1,0 +1,260 @@
+feature: Reference
+background:
+  given: an editor
+examples:
+  - scenario: right before a formula enters its box, with the caret at the start of the source
+    entries:
+      a8f1: {type: math, text: 'U \in \tau'}
+    before: |
+      A set |{{a8f1}} is open by definition.
+    when: ->
+    after: |
+      A set |{{a8f1}} is open by definition.
+    entriesAfter:
+      a8f1: {type: math, text: '|U \in \tau'}
+
+  - scenario: right inside the box moves the caret one character
+    entries:
+      a8f1: {type: math, text: '|U \in \tau'}
+    before: |
+      A set |{{a8f1}} is open by definition.
+    when: ->
+    after: |
+      A set |{{a8f1}} is open by definition.
+    entriesAfter:
+      a8f1: {type: math, text: 'U| \in \tau'}
+
+  - scenario: right at the end of the source leaves the box, after the atom
+    entries:
+      a8f1: {type: math, text: 'U \in \tau|'}
+    before: |
+      A set |{{a8f1}} is open by definition.
+    when: ->
+    after: |
+      A set {{a8f1}}| is open by definition.
+    entriesAfter:
+      a8f1: {type: math, text: 'U \in \tau'}
+
+  - scenario: left after a formula enters its box, with the caret at the end of the source
+    entries:
+      a8f1: {type: math, text: 'U \in \tau'}
+    before: |
+      A set {{a8f1}}| is open by definition.
+    when: <-
+    after: |
+      A set {{a8f1}}| is open by definition.
+    entriesAfter:
+      a8f1: {type: math, text: 'U \in \tau|'}
+
+  - scenario: left at the start of the source leaves the box, before the atom
+    entries:
+      a8f1: {type: math, text: '|U \in \tau'}
+    before: |
+      A set {{a8f1}}| is open by definition.
+    when: <-
+    after: |
+      A set |{{a8f1}} is open by definition.
+    entriesAfter:
+      a8f1: {type: math, text: 'U \in \tau'}
+
+  - scenario: escape leaves the box after the atom
+    entries:
+      a8f1: {type: math, text: 'U| \in \tau'}
+    before: |
+      A set |{{a8f1}} is open by definition.
+    when: escape
+    after: |
+      A set {{a8f1}}| is open by definition.
+    entriesAfter:
+      a8f1: {type: math, text: 'U \in \tau'}
+
+  - scenario: an edit in the box leaves the caret after what was typed
+    entries:
+      a8f1: {type: math, text: '|U \in \tau'}
+    before: |
+      A set |{{a8f1}} is open by definition.
+    when: 'edit(a8f1, U \subseteq X)'
+    after: |
+      A set |{{a8f1}} is open by definition.
+    entriesAfter:
+      a8f1: {type: math, text: 'U \subseteq X|'}
+
+  - scenario: right before an atom of a type with a widget skips it whole
+    entries:
+      b2c3: {type: video, text: '{"row": "0f3a9c1e2b4d6a7f", "width": "wide"}'}
+    before: |
+      Watch |{{b2c3}} before the proof.
+    when: ->
+    after: |
+      Watch {{b2c3}}| before the proof.
+    entriesAfter:
+      b2c3: {type: video, text: '{"row": "0f3a9c1e2b4d6a7f", "width": "wide"}'}
+
+  - scenario: left after an atom of a type with a widget skips it whole
+    entries:
+      b2c3: {type: video, text: '{"row": "0f3a9c1e2b4d6a7f", "width": "wide"}'}
+    before: |
+      Watch {{b2c3}}| before the proof.
+    when: <-
+    after: |
+      Watch |{{b2c3}} before the proof.
+
+  - scenario: right before a reference to no entry skips it whole
+    before: |
+      See |{{zz99}} for the proof.
+    when: ->
+    after: |
+      See {{zz99}}| for the proof.
+
+  - scenario: a letter typed after a reference lands outside it
+    entries:
+      a8f1: {type: math, text: 'U \in \tau'}
+    before: |
+      A set {{a8f1}}| is open by definition.
+    when: "input(A set {{a8f1}},| is open by definition.)"
+    after: |
+      A set {{a8f1}},| is open by definition.
+
+  - scenario: a letter typed before a reference lands outside it
+    entries:
+      a8f1: {type: math, text: 'U \in \tau'}
+    before: |
+      A set |{{a8f1}} is open by definition.
+    when: "input(A set U, |{{a8f1}} is open by definition.)"
+    after: |
+      A set U, |{{a8f1}} is open by definition.
+
+  - scenario: backspace after a reference selects it
+    entries:
+      a8f1: {type: math, text: 'U \in \tau'}
+    before: |
+      A set {{a8f1}}| is open by definition.
+    when: backspace
+    after: |
+      A set {{{a8f1}}} is open by definition.
+
+  - scenario: backspace over a selected reference removes it and keeps its entry
+    entries:
+      a8f1: {type: math, text: 'U \in \tau'}
+    before: |
+      A set {{{a8f1}}} is open by definition.
+    when: backspace
+    after: |
+      A set | is open by definition.
+    entriesAfter:
+      a8f1: {type: math, text: 'U \in \tau'}
+
+  - scenario: delete before a reference selects it
+    entries:
+      a8f1: {type: math, text: 'U \in \tau'}
+    before: |
+      A set |{{a8f1}} is open by definition.
+    when: delete
+    after: |
+      A set {{{a8f1}}} is open by definition.
+
+  - scenario: a selection across a reference removes it with the rest
+    entries:
+      a8f1: {type: math, text: 'U \in \tau'}
+    before: |
+      A {set {{a8f1}} is} open by definition.
+    when: backspace
+    after: |
+      A | open by definition.
+
+  - scenario: enter beside a reference splits around it
+    entries:
+      a8f1: {type: math, text: 'U \in \tau'}
+    before: |
+      A set {{a8f1}}| is open by definition.
+    when: enter
+    after: |
+      A set {{a8f1}}
+      |is open by definition.
+
+  - scenario: a join keeps a reference whole
+    entries:
+      a8f1: {type: math, text: 'U \in \tau'}
+    before: |
+      A set {{a8f1}}
+      |is open by definition.
+    when: backspace
+    after: |
+      A set {{a8f1}} |is open by definition.
+
+  - scenario: bold over a selection holding a reference covers it whole
+    entries:
+      a8f1: {type: math, text: 'U \in \tau'}
+    before: |
+      {A set {{a8f1}} is open} by definition.
+    when: bold
+    after: |
+      **{A set {{a8f1}} is open}** by definition.
+
+  - scenario: bold pending after a reference does not reach into it
+    entries:
+      a8f1: {type: math, text: 'U \in \tau'}
+    before: |
+      A set {{a8f1}}| is open by definition.
+    when: [bold, "input(A set {{a8f1}}U| is open by definition.)"]
+    after: |
+      A set {{a8f1}}**U|** is open by definition.
+
+  - scenario: edit changes the text of an entry and no block
+    entries:
+      a8f1: {type: math, text: 'U \in \tau'}
+    before: |
+      A set {{a8f1}}| is open by definition.
+    when: 'edit(a8f1, U \subseteq X)'
+    after: |
+      A set {{a8f1}}| is open by definition.
+    entriesAfter:
+      a8f1: {type: math, text: 'U \subseteq X'}
+
+  - scenario: insert mints an entry and places its reference at the caret
+    entries:
+      a8f1: {type: math, text: 'U \in \tau'}
+    before: |
+      Every open ball | is open.
+    when: "insert(math, B(x, r))"
+    after: |
+      Every open ball {{e1}}| is open.
+    entriesAfter:
+      a8f1: {type: math, text: 'U \in \tau'}
+      e1: {type: math, text: 'B(x, r)'}
+
+  - scenario: insert over a selection replaces it
+    entries:
+      a8f1: {type: math, text: 'U \in \tau'}
+    before: |
+      Every open ball {B} is open.
+    when: "insert(math, B(x, r))"
+    after: |
+      Every open ball {{e1}}| is open.
+    entriesAfter:
+      a8f1: {type: math, text: 'U \in \tau'}
+      e1: {type: math, text: 'B(x, r)'}
+
+  - scenario: pasting a reference copies its entry under a new id
+    entries:
+      a8f1: {type: math, text: 'U \in \tau'}
+    before: |
+      Both | are open.
+    when: "paste({{a8f1}} and {{a8f1}})"
+    after: |
+      Both {{e1}} and {{e2}}| are open.
+    entriesAfter:
+      a8f1: {type: math, text: 'U \in \tau'}
+      e1: {type: math, text: 'U \in \tau'}
+      e2: {type: math, text: 'U \in \tau'}
+
+  - scenario: pasting a reference to an unknown entry keeps it dangling
+    entries:
+      a8f1: {type: math, text: 'U \in \tau'}
+    before: |
+      See | for the proof.
+    when: "paste({{zz99}})"
+    after: |
+      See {{zz99}}| for the proof.
+    entriesAfter:
+      a8f1: {type: math, text: 'U \in \tau'}

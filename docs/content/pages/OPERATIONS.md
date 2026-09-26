@@ -37,12 +37,25 @@ Hello world
   the caret, `**|**`, hold a pending mark in plain text.
 - The act is a word, with its argument in parentheses: `backspace`,
   `delete`, `enter`, `bold`, `italic`, `code`, `link(/open-sets)`,
-  `heading(2)`, `paragraph`, `item`, `moveUp`, `moveDown`, `paste(...)` and
+  `heading(2)`, `paragraph`, `item`, `display`, `moveUp`, `moveDown`,
+  `paste(...)`, `insert(math, U \in \tau)`, `edit(a8f1, U \in \tau)` and
   `input(For every ε| there is a δ.)`. Several
   acts make a list: `[enter, enter]`. The two arrows, `->` and `<-`, are acts
   too. The argument of `input` is plain text: the browser knows no marks, so
   none are read in it. The argument of `paste` is a document in the notation,
   one line per pasted block.
+- A scenario may carry `entries`, the section's dictionary beside its
+  blocks: an id, a type and a text. `entriesAfter` says what it holds after
+  the act, and when absent the entries are not compared. An entry the act
+  mints takes `e1`, then `e2`. A pipe in an entry's text is the caret of
+  the box under its atom, so the box is open on that entry at that offset.
+  The course writes a literal bar as `\lvert` or `\mid`.
+- An id between double braces in a line, such as `{{`a8f1`}}`, is a
+  reference: characters of the plain text under a mark of its own. It is
+  read before the selection markers, so a selection may open right before
+  one and close right after it. A line that starts with `:: ` is a display
+  block, which holds one reference alone. A card draws a reference as the
+  editor does, the entry rendered by its type, and never as its characters.
 
 The text of every scenario comes from one course on topology. The course
 needs what the editor finds hard: inline math, LaTeX blocks, letters composed
@@ -156,3 +169,40 @@ An item splits into two items, so a list goes on. Enter on an empty item
 leaves the list, and backspace at the start of an item turns it into prose.
 
 {{itemOps}}
+
+## Reference
+
+A reference holds an entry in a block: the id between double braces, under a
+mark of its own. The editor draws it as an atom, the entry rendered by its
+type, and the browser may not edit it. The caret never sits inside an atom.
+What the arrows do at one is the type's to say. A type that enters, such as
+a formula, opens its box: right before the atom opens it with the caret at
+the start of the source, and left after the atom opens it at the end. Inside
+the box the arrows move through the source, and at its edges they leave it,
+after the atom on the right and before it on the left. Escape leaves after
+the atom. A type with a widget of its own, such as a video, is skipped whole,
+and so is a reference to no entry. Typing beside an atom lands outside it,
+and a mark toggled over a range that holds one covers it whole. Backspace
+after an atom selects it, and delete before one does the same, so nothing
+invisible is ever removed; the next backspace removes it and leaves its
+entry in the section. `edit` changes the text of an entry and no block, and
+in an open box it leaves the caret after what was typed. `insert` mints an
+entry and places its reference at the caret; in the editor it is Cmd+M, and
+the box takes the source. A pasted reference copies its entry under a new
+id, so two references never share one entry by accident, and a reference to
+an entry the section does not hold stays as it is.
+
+{{referenceOps}}
+
+## Display
+
+A display is a block form, beside paragraph, heading and item: it holds one
+reference alone and draws it as a block. A formula on its own line is a
+display, and the same formula in a sentence is inline; the entry is the same
+and its type says how it draws in each place. Only a block holding one
+reference alone takes the form, and a block that no longer does, after any
+edit, is prose again. Backspace at the start of a display joins it to the
+paragraph above and its atom lands inline. Enter at its end opens a
+paragraph under it. In the editor the form is Cmd+Alt+4.
+
+{{displayOps}}

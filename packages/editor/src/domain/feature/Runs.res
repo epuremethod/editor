@@ -8,6 +8,13 @@ let rank = (kind: Doc.kind) =>
   | Bold => 1
   | Italic => 2
   | Code => 3
+  | Ref(_) => 4
+  }
+
+let isRef = (kind: Doc.kind) =>
+  switch kind {
+  | Ref(_) => true
+  | _ => false
   }
 
 let has = (kinds: array<Doc.kind>, kind: Doc.kind) => kinds->Array.some(k => k == kind)
@@ -51,7 +58,7 @@ let blank = (text: string, index: int) => text->String.charAt(index)->String.tri
 let soft = (kind: Doc.kind) =>
   switch kind {
   | Bold | Italic => true
-  | Code | Link(_) => false
+  | Code | Link(_) | Ref(_) => false
   }
 
 let trim = (text: string, mark: Doc.mark): Doc.mark => {
@@ -82,7 +89,7 @@ let onlyBlank = (text: string, ~start, ~stop) => {
 
 // The normal form: no empty mark, no two marks of one kind that touch,
 // overlap or are parted by spaces alone, and marks sorted by start then by
-// nesting order.
+// nesting order. Two references never merge: each is one atom.
 let normalize = (text: Doc.text): Doc.text => {
   let marks =
     text.marks
@@ -99,8 +106,9 @@ let normalize = (text: Doc.text): Doc.text => {
     switch merged->Array.get(merged->Array.length - 1) {
     | Some(last)
       if last.kind == mark.kind &&
-        (mark.start <= last.stop ||
-          (soft(mark.kind) && onlyBlank(text.text, ~start=last.stop, ~stop=mark.start))) =>
+      !isRef(mark.kind) &&
+      (mark.start <= last.stop ||
+        (soft(mark.kind) && onlyBlank(text.text, ~start=last.stop, ~stop=mark.start))) =>
       merged->Array.set(
         merged->Array.length - 1,
         {...last, stop: Math.Int.max(last.stop, mark.stop)},
@@ -194,7 +202,8 @@ let remove = (text: Doc.text, ~from, ~to, kind: Doc.kind): Doc.text => {
   normalize({...text, marks})
 }
 
-// Adds `kind` over the span, skipping the units a code span covers.
+// Adds `kind` over the span, skipping the units a code span covers. Code
+// itself skips a reference, since an atom is not text.
 let add = (text: Doc.text, ~from, ~to, kind: Doc.kind): Doc.text => {
   let marks = text.marks->Array.copy
   let start = ref(None)
@@ -206,7 +215,8 @@ let add = (text: Doc.text, ~from, ~to, kind: Doc.kind): Doc.text => {
     | None => ()
     }
   for offset in from to to - 1 {
-    let skipped = kind != Code && has(at(text, offset), Code)
+    let kinds = at(text, offset)
+    let skipped = kind == Code ? kinds->Array.some(isRef) : has(kinds, Code)
     if skipped {
       close(offset)
     } else if start.contents == None {
@@ -247,10 +257,13 @@ let isLink = (kind: Doc.kind) =>
   | _ => false
   }
 
+// A link and a reference close at their end: typing there lands outside.
+let closed = (kind: Doc.kind) => isLink(kind) || isRef(kind)
+
 // The marks a caret holds when it is placed at an offset, by a click or an
 // arrow: the marks around it, and the bold, italic or code run that ends
-// there. A link that ends there is left, and a run that starts there is not
-// entered.
+// there. A link or a reference that ends there is left, and a run that
+// starts there is not entered.
 let placed = (text: Doc.text, offset: int): array<Doc.kind> => {
   let common =
     text.marks
@@ -258,10 +271,37 @@ let placed = (text: Doc.text, offset: int): array<Doc.kind> => {
     ->Array.map(mark => mark.kind)
   let ending =
     text.marks
-    ->Array.filter(mark => mark.stop == offset && mark.start < offset && !isLink(mark.kind))
+    ->Array.filter(mark => mark.stop == offset && mark.start < offset && !closed(mark.kind))
     ->Array.map(mark => mark.kind)
   sorted(common->Array.concat(ending))
 }
+
+// The reference an offset falls strictly inside, if any.
+let refAround = (text: Doc.text, offset: int) =>
+  text.marks->Array.find(mark => isRef(mark.kind) && mark.start < offset && mark.stop > offset)
+
+// The offset moved out of a reference it falls inside: to its end when
+// going forward, to its start when going back. The caret never sits inside
+// an atom.
+let snap = (text: Doc.text, offset: int, ~forward) =>
+  switch refAround(text, offset) {
+  | Some(mark) => forward ? mark.stop : mark.start
+  | None => offset
+  }
+
+// The reference that ends at an offset, and the one that starts there.
+let refEnding = (text: Doc.text, offset: int) =>
+  text.marks->Array.find(mark => isRef(mark.kind) && mark.stop == offset && mark.start < offset)
+
+let refStarting = (text: Doc.text, offset: int) =>
+  text.marks->Array.find(mark => isRef(mark.kind) && mark.start == offset && mark.stop > offset)
+
+// Whether a text is one reference and nothing else: what a display holds.
+let soleRef = (text: Doc.text) =>
+  switch text.marks {
+  | [mark] => isRef(mark.kind) && mark.start == 0 && mark.stop == text.text->String.length
+  | _ => false
+  }
 
 // The length of the punctuation a text starts with, spaces counted too
 // when `spaces` says so.

@@ -24,6 +24,24 @@ const keys = {
   moveDown: "ControlOrMeta+Shift+ArrowDown",
   paragraph: "ControlOrMeta+Alt+Digit0",
   item: "ControlOrMeta+Shift+Digit8",
+  display: "ControlOrMeta+Alt+Digit4",
+  escape: "Escape",
+}
+
+// The entries of a scenario, with the box's caret: a pipe in an entry's
+// text is the caret, as the model's harness reads it.
+const entriesOf = given => {
+  const entries = {}
+  let editing = null
+  for (const [id, entry] of Object.entries(given ?? {})) {
+    const at = entry.text.indexOf("|")
+    if (at === -1) entries[id] = entry
+    else {
+      editing = {entry: id, offset: at}
+      entries[id] = {...entry, text: entry.text.replace("|", "")}
+    }
+  }
+  return {entries, editing}
 }
 
 // `heading(n)` is Cmd+Alt and the digit of its level.
@@ -34,19 +52,45 @@ const acts = when => (Array.isArray(when) ? when : [when]).map(said => {
   return {name: found[1], argument: found[2]}
 })
 
-// Sets the DOM selection inside one block from plain-text offsets.
+// Sets the DOM selection inside one block from plain-text offsets. An atom
+// counts as its reference, an offset at its edge is the position beside
+// it, and a zero-width space counts as nothing.
 const select = ({id, from, to}) => {
   const block = document.querySelector(`#block-${id}`)
-  const texts = []
-  const walk = node => (node.nodeType === 3 ? texts.push(node) : [...node.childNodes].forEach(walk))
+  const zwsp = "\u200b"
+  const units = []
+  const walk = node => {
+    if (node.nodeType === 3) units.push({node, length: node.nodeValue.replaceAll(zwsp, "").length})
+    else if (node.dataset && node.dataset.atom !== undefined) units.push({node, length: node.dataset.atom.length, atom: true})
+    else [...node.childNodes].forEach(walk)
+  }
   walk(block)
+  const rawIndex = (node, count) => {
+    let index = 0
+    let seen = 0
+    while (seen < count && index < node.nodeValue.length) {
+      if (node.nodeValue[index] !== zwsp) seen++
+      index++
+    }
+    return index
+  }
+  const beside = (atom, after) => {
+    const sibling = after ? atom.nextSibling : atom.previousSibling
+    if (sibling && sibling.nodeType === 3) return [sibling, after ? 0 : sibling.nodeValue.length]
+    return [atom.parentNode, [...atom.parentNode.childNodes].indexOf(atom) + (after ? 1 : 0)]
+  }
   const at = offset => {
     let before = 0
-    for (const text of texts) {
-      if (before + text.nodeValue.length >= offset) return [text, offset - before]
-      before += text.nodeValue.length
+    for (const unit of units) {
+      if (unit.atom) {
+        if (offset <= before) return beside(unit.node, false)
+        if (offset <= before + unit.length) return beside(unit.node, true)
+      } else if (before + unit.length >= offset) return [unit.node, rawIndex(unit.node, offset - before)]
+      before += unit.length
     }
-    return texts.length ? [texts.at(-1), texts.at(-1).nodeValue.length] : [block, 0]
+    const last = units.at(-1)
+    if (!last) return [block, 0]
+    return last.atom ? beside(last.node, true) : [last.node, last.node.nodeValue.length]
   }
   const [a, ao] = at(from)
   const [f, fo] = at(to)
@@ -94,7 +138,42 @@ async function click(page, argument) {
   await page.evaluate(select, {id, from: offset, to: offset})
 }
 
-const drivable = when => acts(when).every(act => keyFor(act) || act.name === "input" || act.name === "click")
+// The two parts of an argument, parted by the first comma and space.
+const twoParts = argument => {
+  const at = argument.indexOf(", ")
+  return [argument.slice(0, at), argument.slice(at + 2)]
+}
+
+// `edit(id, text)` as the box's source replaced. When the box is open the
+// source is typed over in place; otherwise a click on the atom opens it,
+// and Escape closes it after.
+async function editEntry(page, argument, open) {
+  const [id, text] = twoParts(argument)
+  if (!open) await page.click(`[data-ref="${id}"]`)
+  await page.waitForSelector(".box__source")
+  await page.keyboard.press("ControlOrMeta+a")
+  await page.keyboard.type(text)
+  if (!open) await page.keyboard.press("Escape")
+}
+
+// `insert(math, text)` as Cmd+M, the source typed into the box, and Escape.
+async function insertEntry(page, argument) {
+  const [, text] = twoParts(argument)
+  await page.keyboard.press("ControlOrMeta+m")
+  await page.waitForSelector(".box__source")
+  await page.keyboard.type(text)
+  await page.keyboard.press("Escape")
+}
+
+const drivable = when =>
+  acts(when).every(
+    act =>
+      keyFor(act) ||
+      act.name === "input" ||
+      act.name === "click" ||
+      act.name === "edit" ||
+      (act.name === "insert" && act.argument.startsWith("math, ")),
+  )
 
 for (const file of readdirSync(dir).filter(name => name.endsWith(".yaml"))) {
   const fixture = parse(readFileSync(new URL(file, dir), "utf8"))
@@ -105,12 +184,18 @@ for (const file of readdirSync(dir).filter(name => name.endsWith(".yaml"))) {
         await page.goto("/", {waitUntil: "domcontentloaded"})
         await page.waitForSelector("#block-a")
         await page.locator(".editor").focus()
-        await page.evaluate(source => window.editor.load(source), example.before)
+        const {entries, editing} = entriesOf(example.entries)
+        await page.evaluate(
+          ([source, entries, editing]) => window.editor.load(source, entries, editing),
+          [example.before, entries, editing],
+        )
         await settle(page)
         for (const act of acts(example.when)) {
           const {name, argument} = act
           if (name === "input") await typeInput(page, argument)
           else if (name === "click") await click(page, argument)
+          else if (name === "edit") await editEntry(page, argument, editing !== null)
+          else if (name === "insert") await insertEntry(page, argument)
           else await page.keyboard.press(keyFor(act))
           await settle(page)
         }
@@ -118,6 +203,11 @@ for (const file of readdirSync(dir).filter(name => name.endsWith(".yaml"))) {
         const expected = write(after.doc, after.labeled)
         const got = await page.evaluate(labels => window.editor.notation(labels), after.labeled)
         expect(got).toBe(expected)
+        if (example.entriesAfter) {
+          const wanted = entriesOf(example.entriesAfter)
+          expect(await page.evaluate(() => window.editor.entries())).toEqual(wanted.entries)
+          expect((await page.evaluate(() => window.editor.editing())) ?? null).toEqual(wanted.editing)
+        }
       })
     }
   })

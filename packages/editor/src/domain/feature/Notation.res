@@ -16,8 +16,14 @@ let labelLine = /^@([a-z][a-z0-9]*)(?: |$)/
 
 let raise = (line, message) => panic(`Notation, line ${Int.toString(line)}: ${message}`)
 
-// The delimiters of inline markdown, kept literal when a line is plain.
-let quote = (text: string) => text->String.replaceRegExp(/[*_`\[\]]/g, "\\$&")
+// The delimiters of inline markdown, kept literal when a line is plain. A
+// double brace is kept too: the browser hands a reference back as its
+// characters, and the mark comes from the block it edits.
+let quote = (text: string) =>
+  text
+  ->String.replaceRegExp(/[*_`\[\]]/g, "\\$&")
+  ->String.replaceRegExp(/\{\{/g, "\\{\\{")
+  ->String.replaceRegExp(/\}\}/g, "\\}\\}")
 
 let readLine = (raw, ~plain) => {
   let (label, rest) = switch labelLine->RegExp.exec(raw) {
@@ -90,7 +96,7 @@ let read = (source: string, ~plain=false): read => {
     }
     seen->Set.add(block.id)
   })
-  {doc: {blocks, selection}, labeled: labeled.contents}
+  {doc: {blocks, selection, entries: Dict.make(), editing: None}, labeled: labeled.contents}
 }
 
 // The markers a block writes: its caret, or the end of the selection it

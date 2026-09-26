@@ -29,6 +29,25 @@ let caret = (block: Doc.id, offset, pending): option<Doc.selection> => Some({
   pending,
 })
 
+// A display holds one reference alone. A block that no longer does, after
+// any edit, is prose again.
+let settle = (doc: Doc.t): Doc.t => {
+  ...doc,
+  blocks: doc.blocks->Array.map(block =>
+    block.form == Display && !Runs.soleRef(block.content) ? {...block, form: Paragraph} : block
+  ),
+}
+
+// Selects one reference whole, the way a backspace beside an atom does.
+let selectMark = (doc: Doc.t, block: Doc.id, mark: Doc.mark): Doc.t => {
+  ...doc,
+  selection: Some({
+    anchor: {block, offset: mark.start},
+    focus: {block, offset: mark.stop},
+    pending: [],
+  }),
+}
+
 // The two ends of a selection in document order.
 let ordered = (doc: Doc.t, selection: Doc.selection) => {
   let {anchor, focus} = selection
@@ -53,10 +72,10 @@ let deleteRange = (doc: Doc.t, selection: Doc.selection): Doc.t => {
       ~to=stop.offset,
       ~inserted={text: "", marks: []},
     )
-    {
+    settle({
       ...replace(doc, from, content),
       selection: caret(start.block, start.offset, Runs.before(content, start.offset)),
-    }
+    })
   } else {
     let head = blockAt(doc, from)
     let first = head.content
@@ -70,7 +89,11 @@ let deleteRange = (doc: Doc.t, selection: Doc.selection): Doc.t => {
       ->Array.slice(~start=0, ~end=from)
       ->Array.concat([{Doc.id: start.block, form: head.form, content}])
       ->Array.concat(doc.blocks->Array.slice(~start=to + 1, ~end=doc.blocks->Array.length))
-    {blocks, selection: caret(start.block, start.offset, Runs.before(content, start.offset))}
+    settle({
+      ...doc,
+      blocks,
+      selection: caret(start.block, start.offset, Runs.before(content, start.offset)),
+    })
   }
 }
 
@@ -116,11 +139,12 @@ let join = (doc: Doc.t, index, ~side): Doc.t => {
     ->Array.slice(~start=0, ~end=index - 1)
     ->Array.concat([{Doc.id: previous.id, form: previous.form, content}])
     ->Array.concat(doc.blocks->Array.slice(~start=index + 1, ~end=doc.blocks->Array.length))
-  {blocks, selection: caret(previous.id, offset, Runs.before(content, offset))}
+  settle({...doc, blocks, selection: caret(previous.id, offset, Runs.before(content, offset))})
 }
 
 // Backspace. Over a range it removes the range. At the start of a block it
-// joins the block with the previous one. Elsewhere it removes the character
+// joins the block with the previous one. After an atom it selects the atom,
+// so nothing invisible is ever removed. Elsewhere it removes the character
 // before the caret.
 let deleteBackward = (doc: Doc.t): Doc.t =>
   switch doc.selection {
@@ -129,24 +153,32 @@ let deleteBackward = (doc: Doc.t): Doc.t =>
   | Some({focus: {block, offset}}) =>
     let index = indexOf(doc, block)
     let here = blockAt(doc, index)
-    if offset == 0 && here.form != Paragraph {
-      // A heading or an item turns back into prose before it joins.
-      let blocks = doc.blocks->Array.copy
-      blocks->Array.set(index, {...here, form: Paragraph})
-      {...doc, blocks}
-    } else if offset == 0 {
-      index == 0 ? doc : join(doc, index, ~side=Second)
-    } else {
-      let content = blockAt(doc, index).content
-      let from = Runs.back(content.text, offset)
-      let content = Runs.splice(content, ~from, ~to=offset, ~inserted={text: "", marks: []})
-      {...replace(doc, index, content), selection: caret(block, from, Runs.before(content, from))}
+    switch Runs.refEnding(here.content, offset) {
+    | Some(mark) => selectMark(doc, block, mark)
+    | None =>
+      if offset == 0 && here.form != Paragraph && here.form != Display {
+        // A heading or an item turns back into prose before it joins. A
+        // display joins at once, and its atom lands inline.
+        let blocks = doc.blocks->Array.copy
+        blocks->Array.set(index, {...here, form: Paragraph})
+        {...doc, blocks}
+      } else if offset == 0 {
+        index == 0 ? doc : join(doc, index, ~side=Second)
+      } else {
+        let content = blockAt(doc, index).content
+        let from = Runs.back(content.text, offset)
+        let content = Runs.splice(content, ~from, ~to=offset, ~inserted={text: "", marks: []})
+        settle({
+          ...replace(doc, index, content),
+          selection: caret(block, from, Runs.before(content, from)),
+        })
+      }
     }
   }
 
 // Delete. Over a range it removes the range. At the end of a block it joins
-// the next block onto it. Elsewhere it removes the character after the
-// caret.
+// the next block onto it. Before an atom it selects the atom. Elsewhere it
+// removes the character after the caret.
 let deleteForward = (doc: Doc.t): Doc.t =>
   switch doc.selection {
   | None => doc
@@ -154,14 +186,18 @@ let deleteForward = (doc: Doc.t): Doc.t =>
   | Some({focus: {block, offset}}) =>
     let index = indexOf(doc, block)
     let content = blockAt(doc, index).content
-    if offset == content.text->String.length {
-      index + 1 < doc.blocks->Array.length ? join(doc, index + 1, ~side=First) : doc
-    } else {
-      let to = Runs.forward(content.text, offset)
-      let content = Runs.splice(content, ~from=offset, ~to, ~inserted={text: "", marks: []})
-      {
-        ...replace(doc, index, content),
-        selection: caret(block, offset, Runs.before(content, offset)),
+    switch Runs.refStarting(content, offset) {
+    | Some(mark) => selectMark(doc, block, mark)
+    | None =>
+      if offset == content.text->String.length {
+        index + 1 < doc.blocks->Array.length ? join(doc, index + 1, ~side=First) : doc
+      } else {
+        let to = Runs.forward(content.text, offset)
+        let content = Runs.splice(content, ~from=offset, ~to, ~inserted={text: "", marks: []})
+        settle({
+          ...replace(doc, index, content),
+          selection: caret(block, offset, Runs.before(content, offset)),
+        })
       }
     }
   }
@@ -184,12 +220,13 @@ let leadingBlank = (text: string, offset) => {
 
 // The forms of the two halves of a split. Prose splits into prose. A
 // heading follows its text: the half that holds it stays a heading, and an
-// empty half is prose. An item splits into two items, so a list goes on.
+// empty half is prose. An item splits into two items, so a list goes on. A
+// display follows its atom, and the other half is prose.
 let halves = (form: Doc.form, ~firstEmpty, ~secondEmpty): (Doc.form, Doc.form) =>
   switch form {
   | Paragraph => (Paragraph, Paragraph)
   | Item => (Item, Item)
-  | Heading(_) => firstEmpty && !secondEmpty ? (Paragraph, form) : (form, Paragraph)
+  | Heading(_) | Display => firstEmpty && !secondEmpty ? (Paragraph, form) : (form, Paragraph)
   }
 
 // Splits the block holding the caret. The first half keeps its id; the second
@@ -228,7 +265,7 @@ let rec split = (doc: Doc.t, ~id: Doc.id): Doc.t =>
           {id, form: secondForm, content: second},
         ])
         ->Array.concat(doc.blocks->Array.slice(~start=index + 1, ~end=doc.blocks->Array.length))
-      {blocks, selection: caret(id, 0, [])}
+      settle({...doc, blocks, selection: caret(id, 0, [])})
     }
   }
 
@@ -288,7 +325,9 @@ let input = (doc: Doc.t, ~text: string, ~anchor: int, ~focus: int): Doc.t =>
     let from = prefix
     let to = oldLength - suffix
     let inserted = text->String.slice(~start=prefix, ~end=newLength - suffix)
-    let kinds = to > from ? Runs.at(old, from) : selection.pending
+    // Typed text is never a reference: what replaces a selected atom is text.
+    let kinds =
+      (to > from ? Runs.at(old, from) : selection.pending)->Array.filter(k => !Runs.isRef(k))
     // Punctuation typed at the end of a run lands outside it, and so does
     // a space typed at the end of a code span: what is typed then drops the
     // marks that end at the caret, and the caret keeps what it took.
@@ -305,14 +344,14 @@ let input = (doc: Doc.t, ~text: string, ~anchor: int, ~focus: int): Doc.t =>
       ~inserted={text: inserted, marks: Runs.over(kinds, ~start=0, ~stop=inserted->String.length)},
     )
     let pending = inserted == "" ? Runs.before(content, focus) : kinds
-    {
+    settle({
       ...replace(doc, index, content),
       selection: Some({
         anchor: {block: id, offset: anchor},
         focus: {block: id, offset: focus},
         pending,
       }),
-    }
+    })
   }
 
 // The span a selection covers in one block, by index.
@@ -407,56 +446,126 @@ let link = (doc: Doc.t, ~href: string): Doc.t =>
   }
 
 // Places the selection where a click or a drag put it. A caret takes the
-// marks of its place; a range holds no pending marks.
-let select = (doc: Doc.t, ~anchor: Doc.point, ~focus: Doc.point): Doc.t => {
-  let pending =
+// marks of its place, and never sits inside an atom: it steps out of a
+// reference, forward unless told otherwise. A range holds no pending marks.
+// A selection placed in the blocks closes the box.
+let select = (doc: Doc.t, ~anchor: Doc.point, ~focus: Doc.point, ~forward=true): Doc.t => {
+  let content = blockAt(doc, indexOf(doc, focus.block)).content
+  let (anchor, focus) =
     anchor == focus
-      ? Runs.placed(blockAt(doc, indexOf(doc, focus.block)).content, focus.offset)
-      : []
-  {...doc, selection: Some({anchor, focus, pending})}
+      ? {
+          let offset = Runs.snap(content, focus.offset, ~forward)
+          ({...focus, offset}, {...focus, offset})
+        }
+      : (anchor, focus)
+  let pending = anchor == focus ? Runs.placed(content, focus.offset) : []
+  {...doc, selection: Some({anchor, focus, pending}), editing: None}
 }
 
-let placeAt = (doc: Doc.t, point: Doc.point) => select(doc, ~anchor=point, ~focus=point)
+let placeAt = (doc: Doc.t, point: Doc.point, ~forward=true) =>
+  select(doc, ~anchor=point, ~focus=point, ~forward)
+
+// Whether an entry enters: the host says by its type. A reference to no
+// entry never enters.
+type enters = Doc.entry => bool
+
+let entering = (doc: Doc.t, ~enters: enters, id: Doc.id) =>
+  doc.entries->Dict.get(id)->Option.mapOr(false, enters)
+
+// Opens the box of an entry at an offset of its source, the end when none
+// is given. The block selection stays where it is.
+let enter = (doc: Doc.t, ~id: Doc.id, ~offset=?): Doc.t =>
+  switch doc.entries->Dict.get(id) {
+  | Some(entry) => {
+      ...doc,
+      editing: Some({entry: id, offset: offset->Option.getOr(entry.text->String.length)}),
+    }
+  | None => doc
+  }
+
+// The reference the box was entered from: the one beside the block caret.
+let entered = (doc: Doc.t, id: Doc.id) =>
+  switch doc.selection {
+  | Some({focus: {block, offset}}) =>
+    let content = blockAt(doc, indexOf(doc, block)).content
+    content.marks
+    ->Array.find(mark => mark.kind == Ref(id) && (mark.start == offset || mark.stop == offset))
+    ->Option.map(mark => (block, mark))
+  | None => None
+  }
+
+// Closes the box and lands the caret beside the atom, after it unless told
+// otherwise. Escape lands after.
+let leave = (doc: Doc.t, ~after=true): Doc.t =>
+  switch doc.editing {
+  | None => doc
+  | Some({entry}) =>
+    switch entered(doc, entry) {
+    | Some((block, mark)) => placeAt(doc, {block, offset: after ? mark.stop : mark.start})
+    | None => {...doc, editing: None}
+    }
+  }
 
 // Moves the caret one character forward and places it there. At the end of
 // a block it moves to the start of the next one. A range collapses to its
-// end.
-let right = (doc: Doc.t): Doc.t =>
-  switch doc.selection {
-  | None => doc
-  | Some(selection) if !collapsed(selection) =>
+// end. Before an atom that enters, it opens the box at the start of the
+// source; inside the box it moves through the source, and at its end it
+// leaves after the atom. Any other atom is stepped over whole.
+let right = (doc: Doc.t, ~enters: enters): Doc.t =>
+  switch (doc.editing, doc.selection) {
+  | (Some({entry, offset}), _) =>
+    switch doc.entries->Dict.get(entry) {
+    | Some(text) if offset < text.text->String.length =>
+      enter(doc, ~id=entry, ~offset=Runs.forward(text.text, offset))
+    | _ => leave(doc, ~after=true)
+    }
+  | (None, None) => doc
+  | (None, Some(selection)) if !collapsed(selection) =>
     let (_, stop) = ordered(doc, selection)
     placeAt(doc, stop)
-  | Some({focus: {block, offset}}) =>
+  | (None, Some({focus: {block, offset}})) =>
     let index = indexOf(doc, block)
     let content = blockAt(doc, index).content
-    if offset < content.text->String.length {
-      placeAt(doc, {block, offset: Runs.forward(content.text, offset)})
-    } else {
-      switch doc.blocks->Array.get(index + 1) {
-      | Some(next) => placeAt(doc, {block: next.id, offset: 0})
-      | None => doc
+    switch Runs.refStarting(content, offset) {
+    | Some({kind: Ref(id)}) if entering(doc, ~enters, id) => enter(doc, ~id, ~offset=0)
+    | _ =>
+      if offset < content.text->String.length {
+        placeAt(doc, {block, offset: Runs.forward(content.text, offset)})
+      } else {
+        switch doc.blocks->Array.get(index + 1) {
+        | Some(next) => placeAt(doc, {block: next.id, offset: 0})
+        | None => doc
+        }
       }
     }
   }
 
 // Moves the caret one character back, the mirror of `right`.
-let left = (doc: Doc.t): Doc.t =>
-  switch doc.selection {
-  | None => doc
-  | Some(selection) if !collapsed(selection) =>
+let left = (doc: Doc.t, ~enters: enters): Doc.t =>
+  switch (doc.editing, doc.selection) {
+  | (Some({entry, offset}), _) =>
+    switch doc.entries->Dict.get(entry) {
+    | Some(text) if offset > 0 => enter(doc, ~id=entry, ~offset=Runs.back(text.text, offset))
+    | _ => leave(doc, ~after=false)
+    }
+  | (None, None) => doc
+  | (None, Some(selection)) if !collapsed(selection) =>
     let (start, _) = ordered(doc, selection)
     placeAt(doc, start)
-  | Some({focus: {block, offset}}) =>
+  | (None, Some({focus: {block, offset}})) =>
     let index = indexOf(doc, block)
     let content = blockAt(doc, index).content
-    if offset > 0 {
-      placeAt(doc, {block, offset: Runs.back(content.text, offset)})
-    } else {
-      switch index > 0 ? Some(blockAt(doc, index - 1)) : None {
-      | Some(previous) =>
-        placeAt(doc, {block: previous.id, offset: previous.content.text->String.length})
-      | None => doc
+    switch Runs.refEnding(content, offset) {
+    | Some({kind: Ref(id)}) if entering(doc, ~enters, id) => enter(doc, ~id)
+    | _ =>
+      if offset > 0 {
+        placeAt(doc, {block, offset: Runs.back(content.text, offset)}, ~forward=false)
+      } else {
+        switch index > 0 ? Some(blockAt(doc, index - 1)) : None {
+        | Some(previous) =>
+          placeAt(doc, {block: previous.id, offset: previous.content.text->String.length})
+        | None => doc
+        }
       }
     }
   }
@@ -501,17 +610,85 @@ let moveDown = (doc: Doc.t): Doc.t =>
     to + 1 >= doc.blocks->Array.length ? doc : moveBlocks(doc, ~from, ~to, ~by=1)
   }
 
+// The references in pasted blocks that name an entry the document holds,
+// one per reference in order. Each is copied under an id the caller mints,
+// so two references never share one entry by accident.
+let adopted = (doc: Doc.t, ~blocks: array<Doc.text>): array<Doc.id> =>
+  blocks->Array.flatMap(text =>
+    text.marks
+    ->Array.toSorted((a, b) => Int.compare(a.start, b.start))
+    ->Array.filterMap(mark =>
+      switch mark.kind {
+      | Ref(id) if doc.entries->Dict.has(id) => Some(id)
+      | _ => None
+      }
+    )
+  )
+
+// Rewrites each adopted reference to its copy, last first so offsets hold.
+let renamed = (text: Doc.text, ~take: Doc.id => option<Doc.id>): Doc.text => {
+  let refs =
+    text.marks
+    ->Array.filter(mark => Runs.isRef(mark.kind))
+    ->Array.toSorted((a, b) => Int.compare(a.start, b.start))
+  let renames = refs->Array.filterMap(mark =>
+    switch mark.kind {
+    | Ref(id) => take(id)->Option.map(fresh => (mark, fresh))
+    | _ => None
+    }
+  )
+  renames
+  ->Array.toReversed
+  ->Array.reduce(text, (text, (mark, fresh)) => {
+    let reference = "{{" ++ fresh ++ "}}"
+    Runs.splice(
+      text,
+      ~from=mark.start,
+      ~to=mark.stop,
+      ~inserted={
+        text: reference,
+        marks: [{kind: Ref(fresh), start: 0, stop: reference->String.length}],
+      },
+    )
+  })
+}
+
 // Pastes blocks at the caret, over the selection when there is one. One
 // block goes into the text at the caret. Several split the block: the first
 // pasted block joins the text before the caret, the last joins the text
-// after, both the way a join does, and the rest sit between as new blocks. The new blocks take `ids`,
-// one per block after the first, which the caller minted. The caret lands
-// at the end of what was pasted.
-let rec paste = (doc: Doc.t, ~blocks: array<Doc.text>, ~ids: array<Doc.id>): Doc.t =>
+// after, both the way a join does, and the rest sit between as new blocks.
+// The new blocks take `ids`, one per block after the first, and the copied
+// entries take `entryIds`, one per adopted reference, both minted by the
+// caller. A reference to an entry the document does not hold stays as it
+// is. The caret lands at the end of what was pasted.
+let rec paste = (
+  doc: Doc.t,
+  ~blocks: array<Doc.text>,
+  ~ids: array<Doc.id>,
+  ~entryIds: array<Doc.id>=[],
+): Doc.t =>
   switch doc.selection {
   | None => doc
-  | Some(selection) if !collapsed(selection) => paste(deleteRange(doc, selection), ~blocks, ~ids)
+  | Some(selection) if !collapsed(selection) =>
+    paste(deleteRange(doc, selection), ~blocks, ~ids, ~entryIds)
   | Some({focus: {block, offset}}) =>
+    let olds = adopted(doc, ~blocks)
+    if entryIds->Array.length != olds->Array.length {
+      panic("paste takes one entry id for every reference it copies")
+    }
+    let entries = doc.entries->Dict.copy
+    let next = ref(0)
+    let take = old =>
+      switch doc.entries->Dict.get(old) {
+      | Some(entry) =>
+        let fresh = entryIds->Array.getUnsafe(next.contents)
+        next := next.contents + 1
+        entries->Dict.set(fresh, entry)
+        Some(fresh)
+      | None => None
+      }
+    let blocks = blocks->Array.map(text => renamed(text, ~take))
+    let doc = {...doc, entries}
     let index = indexOf(doc, block)
     let content = blockAt(doc, index).content
     let count = blocks->Array.length
@@ -550,13 +727,61 @@ let rec paste = (doc: Doc.t, ~blocks: array<Doc.text>, ~ids: array<Doc.id>): Doc
         ->Array.concat([{id: lastId, form: Paragraph, content: tail}])
         ->Array.concat(doc.blocks->Array.slice(~start=index + 1, ~end=doc.blocks->Array.length))
       let offset = last.text->String.length
-      {blocks, selection: caret(lastId, offset, Runs.before(tail, offset))}
+      settle({...doc, blocks, selection: caret(lastId, offset, Runs.before(tail, offset))})
     | _ => doc
     }
   }
 
+// Sets the text of an entry. No block changes: the blocks hold references.
+// When the entry's box is open, its caret lands at `offset`, the end of the
+// text when none is given.
+let edit = (doc: Doc.t, ~id: Doc.id, ~text: string, ~offset=?): Doc.t =>
+  switch doc.entries->Dict.get(id) {
+  | Some(entry) =>
+    let entries = doc.entries->Dict.copy
+    entries->Dict.set(id, {...entry, text})
+    let editing = switch doc.editing {
+    | Some({entry}) if entry == id =>
+      Some({Doc.entry: id, offset: offset->Option.getOr(text->String.length)})
+    | other => other
+    }
+    {...doc, entries, editing}
+  | None => panic(`The entry ${id} is not in the document`)
+  }
+
+// Mints an entry under `id`, which the caller minted, and places its
+// reference at the caret, over the selection when there is one. The caret
+// lands after the atom.
+let rec insert = (doc: Doc.t, ~id: Doc.id, ~type_: string, ~text: string): Doc.t =>
+  switch doc.selection {
+  | None => doc
+  | Some(selection) if !collapsed(selection) =>
+    insert(deleteRange(doc, selection), ~id, ~type_, ~text)
+  | Some({focus: {block, offset}}) =>
+    let index = indexOf(doc, block)
+    let reference = "{{" ++ id ++ "}}"
+    let content = Runs.splice(
+      blockAt(doc, index).content,
+      ~from=offset,
+      ~to=offset,
+      ~inserted={
+        text: reference,
+        marks: [{kind: Ref(id), start: 0, stop: reference->String.length}],
+      },
+    )
+    let offset = offset + reference->String.length
+    let entries = doc.entries->Dict.copy
+    entries->Dict.set(id, {type_, text})
+    {
+      ...replace(doc, index, content),
+      entries,
+      selection: caret(block, offset, Runs.placed(content, offset)),
+    }
+  }
+
 // Sets the form of every block the selection covers. Setting the form a
-// block already has turns it back into prose, so one key toggles.
+// block already has turns it back into prose, so one key toggles. Only a
+// block holding one reference alone takes the display form.
 let form = (doc: Doc.t, ~form: Doc.form): Doc.t =>
   switch doc.selection {
   | None => doc
@@ -564,9 +789,16 @@ let form = (doc: Doc.t, ~form: Doc.form): Doc.t =>
     let (from, to) = reach(doc, selection)
     let covered = doc.blocks->Array.slice(~start=from, ~end=to + 1)
     let already = covered->Array.every(block => block.form == form)
-    let blocks =
-      doc.blocks->Array.mapWithIndex((block, index) =>
-        index < from || index > to ? block : {...block, form: already ? Paragraph : form}
-      )
+    let blocks = doc.blocks->Array.mapWithIndex((block, index) =>
+      if index < from || index > to {
+        block
+      } else if already {
+        {...block, form: Paragraph}
+      } else if form == Display && !Runs.soleRef(block.content) {
+        block
+      } else {
+        {...block, form}
+      }
+    )
     {...doc, blocks}
   }

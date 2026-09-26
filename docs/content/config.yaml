@@ -33,6 +33,7 @@ var:
       <link rel="preconnect" href="https://fonts.googleapis.com">
       <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
       <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jost:ital,wght@0,300;0,400;0,500;0,700;1,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+      <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.18.9/dist/katex.min.css">
       <link rel="stylesheet" href="./style.css">
     </head>
     <body>
@@ -67,56 +68,18 @@ build:
     var:
       title: Operations — Editor
       running: Operations
-      joinOps:
-        {
-          file: ../../packages/editor/src/design/operations/join.yaml,
-          transform: operations
-        }
-      splitOps:
-        {
-          file: ../../packages/editor/src/design/operations/split.yaml,
-          transform: operations
-        }
-      inputOps:
-        {
-          file: ../../packages/editor/src/design/operations/input.yaml,
-          transform: operations
-        }
-      marksOps:
-        {
-          file: ../../packages/editor/src/design/operations/marks.yaml,
-          transform: operations
-        }
-      caretOps:
-        {
-          file: ../../packages/editor/src/design/operations/caret.yaml,
-          transform: operations
-        }
-      deleteOps:
-        {
-          file: ../../packages/editor/src/design/operations/delete.yaml,
-          transform: operations
-        }
-      moveOps:
-        {
-          file: ../../packages/editor/src/design/operations/move.yaml,
-          transform: operations
-        }
-      pasteOps:
-        {
-          file: ../../packages/editor/src/design/operations/paste.yaml,
-          transform: operations
-        }
-      headingOps:
-        {
-          file: ../../packages/editor/src/design/operations/heading.yaml,
-          transform: operations
-        }
-      itemOps:
-        {
-          file: ../../packages/editor/src/design/operations/item.yaml,
-          transform: operations
-        }
+      joinOps: { value: join, transform: operations }
+      splitOps: { value: split, transform: operations }
+      inputOps: { value: input, transform: operations }
+      marksOps: { value: marks, transform: operations }
+      caretOps: { value: caret, transform: operations }
+      deleteOps: { value: delete, transform: operations }
+      moveOps: { value: move, transform: operations }
+      pasteOps: { value: paste, transform: operations }
+      headingOps: { value: heading, transform: operations }
+      itemOps: { value: item, transform: operations }
+      referenceOps: { value: reference, transform: operations }
+      displayOps: { value: display, transform: operations }
       pageBody: { file: pages/OPERATIONS.md, transform: docsMd }
       operationsToc: { file: pages/OPERATIONS.md, transform: docsToc }
       operationsCurrent: ' aria-current="page"'
