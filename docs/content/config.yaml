@@ -28,8 +28,8 @@ var:
           <a href="https://rescript-lang.org">ReScript</a>,
           <a href="https://react.dev">React</a>,
           <a href="https://katex.org">KaTeX</a>,
-          <a href="https://vitest.dev">Vitest</a> and the
-          <a href="https://epurejs.dev">épure method</a>
+          <a href="https://vitest.dev">Vitest</a> and
+          <a href="https://epurejs.dev">@epure/vitest</a>
         </span>
       </footer>
     </aside>

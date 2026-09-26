@@ -38,4 +38,6 @@ notation described on the Operations page.
 
 Built with [tilia](https://tiliajs.dev), [ReScript](https://rescript-lang.org),
 [React](https://react.dev), [KaTeX](https://katex.org),
-[Vitest](https://vitest.dev) and the [épure method](https://epurejs.dev).
+[Vitest](https://vitest.dev) and [@epure/vitest](https://epurejs.dev), which
+runs the scenarios the way the [épure method](https://epuremethod.com)
+writes them.
