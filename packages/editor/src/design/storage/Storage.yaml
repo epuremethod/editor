@@ -80,15 +80,15 @@ examples:
       @b the preimage of every open set is open.
 
   - scenario: a reference reads into a mark and writes back as it was
-    entries:
+    atoms:
       a8f1: |-
         math
         U \in \tau
     blocks:
       - "A set {{a8f1}} is open by definition."
 
-  - scenario: one entry is drawn inline in a sentence and as a display block from one text
-    entries:
+  - scenario: one atom is drawn inline in a sentence and as a display block from one text
+    atoms:
       a8f1: |-
         math
         \emptyset \in \tau \quad\text{and}\quad X \in \tau
@@ -96,8 +96,8 @@ examples:
       - "The pair {{a8f1}} is the first axiom."
       - ":: {{a8f1}}"
 
-  - scenario: an entry keeps its newlines, and its type is its first line
-    entries:
+  - scenario: an atom keeps its newlines, and its type is its first line
+    atoms:
       a8f1: |-
         math
         \begin{aligned}
@@ -113,14 +113,14 @@ examples:
 
   - scenario: a double brace inside a code span is text
     blocks:
-      - "Write `{{a8f1}}` to name an entry."
+      - "Write `{{a8f1}}` to name an atom."
 
-  - scenario: a reference to an entry the section does not hold is still a reference
+  - scenario: a reference to an atom the section does not hold is still a reference
     blocks:
       - "See {{zz99}} for the proof."
 
-  - scenario: an entry the host holds is on the port and never in a block
-    entries:
+  - scenario: an atom the host holds is on the port and never in a block
+    atoms:
       a8f1: |-
         math
         U \in \tau
@@ -131,18 +131,18 @@ examples:
       - "A set {{a8f1}} is open by definition."
       - ":: {{b2c3}}"
 
-  - scenario: an entry with no source is its type and a newline
-    entries:
+  - scenario: an atom with no source is its type and a newline
+    atoms:
       a8f1: |-
         math
     blocks:
       - "An empty formula {{a8f1}} draws nothing yet."
-    canonicalEntries:
+    canonicalAtoms:
       a8f1: "math\n"
 
-  - scenario: an edit of an entry hands the section back with its entries
+  - scenario: an edit of an atom hands the section back with its atoms
     given: an editor over a section
-    entries:
+    atoms:
       a8f1: |-
         math
         U \in \tau
@@ -151,14 +151,14 @@ examples:
     when: 'edit(a8f1, U \subseteq X)'
     update: |
       @a A set {{a8f1}} is open by definition.
-    entriesAfter:
+    atomsAfter:
       a8f1: |-
         math
         U \subseteq X
 
-  - scenario: removing a reference hands the section back with the entry still in it
+  - scenario: removing a reference hands the section back with the atom still in it
     given: an editor over a section
-    entries:
+    atoms:
       a8f1: |-
         math
         U \in \tau
@@ -167,7 +167,7 @@ examples:
     when: backspace
     update: |
       @a A set  is open by definition.
-    entriesAfter:
+    atomsAfter:
       a8f1: |-
         math
         U \in \tau

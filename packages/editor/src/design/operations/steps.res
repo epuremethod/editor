@@ -12,14 +12,14 @@ open EpureVitest
 // it: plain text and the selection, with no marks, since the browser knows
 // none.
 
-// `entries` is the dictionary the document starts with, and `entriesAfter`
-// what it holds after the acts; when absent, entries are not compared.
+// `atoms` is the dictionary the document starts with, and `atomsAfter`
+// what it holds after the acts; when absent, atoms are not compared.
 type example = {
   before: string,
   @as("when") when_: JSON.t,
   after: string,
-  entries?: dict<Doc.entry>,
-  entriesAfter?: dict<Doc.entry>,
+  atoms?: dict<Doc.atom>,
+  atomsAfter?: dict<Doc.atom>,
 }
 
 let actLine = /^(\w+|->|<-)(?:\((.*)\))?$/s
@@ -43,36 +43,36 @@ let mint = (doc: Doc.t) => mintMany(doc, 1)->Array.getUnsafe(0)
 
 // The harness's one rule for what enters: a type with a widget skips, and
 // video is the type with a widget in the fixtures.
-let enters: Edit.enters = entry => entry.type_ != "video"
+let enters: Edit.enters = atom => atom.type_ != "video"
 
-// The entries of a scenario, with the box's caret: a pipe in an entry's
-// text is the caret, and the entry with it is the one being edited.
-let entriesOf = (given: option<dict<Doc.entry>>): (dict<Doc.entry>, option<Doc.editing>) => {
-  let entries = Dict.make()
+// The atoms of a scenario, with the box's caret: a pipe in an atom's
+// text is the caret, and the atom with it is the one being edited.
+let atomsOf = (given: option<dict<Doc.atom>>): (dict<Doc.atom>, option<Doc.editing>) => {
+  let atoms = Dict.make()
   let editing = ref(None)
   given
   ->Option.getOr(Dict.make())
-  ->Dict.forEachWithKey((entry, id) =>
-    switch entry.text->String.indexOf("|") {
-    | -1 => entries->Dict.set(id, entry)
+  ->Dict.forEachWithKey((atom, id) =>
+    switch atom.text->String.indexOf("|") {
+    | -1 => atoms->Dict.set(id, atom)
     | offset =>
       if editing.contents != None {
-        panic("one entry at most holds the caret")
+        panic("one atom at most holds the caret")
       }
-      editing := Some({Doc.entry: id, offset})
-      entries->Dict.set(id, {...entry, text: entry.text->String.replace("|", "")})
+      editing := Some({Doc.atom: id, offset})
+      atoms->Dict.set(id, {...atom, text: atom.text->String.replace("|", "")})
     }
   )
-  (entries, editing.contents)
+  (atoms, editing.contents)
 }
 
-// A minted entry takes `e1`, `e2` and on, skipping ids the document holds.
-let mintEntries = (doc: Doc.t, count) => {
+// A minted atom takes `e1`, `e2` and on, skipping ids the document holds.
+let mintAtoms = (doc: Doc.t, count) => {
   let out = []
   let n = ref(1)
   while out->Array.length < count {
     let id = `e${Int.toString(n.contents)}`
-    if !(doc.entries->Dict.has(id)) {
+    if !(doc.atoms->Dict.has(id)) {
       out->Array.push(id)
     }
     n := n.contents + 1
@@ -111,7 +111,7 @@ let act = (doc: Doc.t, said: string) => {
     Edit.edit(doc, ~id, ~text)
   | ("insert", Some(argument)) =>
     let (type_, text) = twoParts(argument, ~act="insert")
-    Edit.insert(doc, ~id=mintEntries(doc, 1)->Array.getUnsafe(0), ~type_, ~text)
+    Edit.insert(doc, ~id=mintAtoms(doc, 1)->Array.getUnsafe(0), ~type_, ~text)
   | ("click", Some(block)) =>
     let {doc: placed} = Notation.read(block, ~plain=true)
     switch (doc.selection, placed.selection) {
@@ -128,8 +128,8 @@ let act = (doc: Doc.t, said: string) => {
   | ("paste", Some(source)) =>
     let {doc: pasted} = Notation.read(source)
     let blocks = pasted.blocks->Array.map(block => block.content)
-    let entryIds = mintEntries(doc, Edit.adopted(doc, ~blocks)->Array.length)
-    Edit.paste(doc, ~blocks, ~ids=mintMany(doc, blocks->Array.length - 1), ~entryIds)
+    let atomIds = mintAtoms(doc, Edit.adopted(doc, ~blocks)->Array.length)
+    Edit.paste(doc, ~blocks, ~ids=mintMany(doc, blocks->Array.length - 1), ~atomIds)
   | ("->", None) => Edit.right(doc, ~enters)
   | ("<-", None) => Edit.left(doc, ~enters)
   | ("escape", None) => Edit.leave(doc)
@@ -168,14 +168,14 @@ given1("an editor", (_on, example: example) => {
   let before = Notation.read(example.before)
   let after = Notation.read(example.after)
   let labels = after.labeled
-  let (entries, editing) = entriesOf(example.entries)
-  let start = {...before.doc, entries, editing}
+  let (atoms, editing) = atomsOf(example.atoms)
+  let start = {...before.doc, atoms, editing}
   let result = acts(example.when_)->Array.reduce(start, act)
   expect(Notation.write(result, ~labels)).toBe(Notation.write(after.doc, ~labels))
-  switch example.entriesAfter {
+  switch example.atomsAfter {
   | Some(given) =>
-    let (entries, editing) = entriesOf(Some(given))
-    expect(result.entries).toEqual(entries)
+    let (atoms, editing) = atomsOf(Some(given))
+    expect(result.atoms).toEqual(atoms)
     expect(result.editing).toEqual(editing)
   | None => ()
   }

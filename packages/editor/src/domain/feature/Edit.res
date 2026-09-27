@@ -465,20 +465,20 @@ let select = (doc: Doc.t, ~anchor: Doc.point, ~focus: Doc.point, ~forward=true):
 let placeAt = (doc: Doc.t, point: Doc.point, ~forward=true) =>
   select(doc, ~anchor=point, ~focus=point, ~forward)
 
-// Whether an entry enters: the host says by its type. A reference to no
-// entry never enters.
-type enters = Doc.entry => bool
+// Whether an atom enters: the host says by its type. A reference to no
+// atom never enters.
+type enters = Doc.atom => bool
 
 let entering = (doc: Doc.t, ~enters: enters, id: Doc.id) =>
-  doc.entries->Dict.get(id)->Option.mapOr(false, enters)
+  doc.atoms->Dict.get(id)->Option.mapOr(false, enters)
 
-// Opens the box of an entry at an offset of its source, the end when none
+// Opens the box of an atom at an offset of its source, the end when none
 // is given. The block selection stays where it is.
 let enter = (doc: Doc.t, ~id: Doc.id, ~offset=?): Doc.t =>
-  switch doc.entries->Dict.get(id) {
-  | Some(entry) => {
+  switch doc.atoms->Dict.get(id) {
+  | Some(atom) => {
       ...doc,
-      editing: Some({entry: id, offset: offset->Option.getOr(entry.text->String.length)}),
+      editing: Some({atom: id, offset: offset->Option.getOr(atom.text->String.length)}),
     }
   | None => doc
   }
@@ -499,8 +499,8 @@ let entered = (doc: Doc.t, id: Doc.id) =>
 let leave = (doc: Doc.t, ~after=true): Doc.t =>
   switch doc.editing {
   | None => doc
-  | Some({entry}) =>
-    switch entered(doc, entry) {
+  | Some({atom}) =>
+    switch entered(doc, atom) {
     | Some((block, mark)) => placeAt(doc, {block, offset: after ? mark.stop : mark.start})
     | None => {...doc, editing: None}
     }
@@ -513,10 +513,10 @@ let leave = (doc: Doc.t, ~after=true): Doc.t =>
 // leaves after the atom. Any other atom is stepped over whole.
 let right = (doc: Doc.t, ~enters: enters): Doc.t =>
   switch (doc.editing, doc.selection) {
-  | (Some({entry, offset}), _) =>
-    switch doc.entries->Dict.get(entry) {
+  | (Some({atom, offset}), _) =>
+    switch doc.atoms->Dict.get(atom) {
     | Some(text) if offset < text.text->String.length =>
-      enter(doc, ~id=entry, ~offset=Runs.forward(text.text, offset))
+      enter(doc, ~id=atom, ~offset=Runs.forward(text.text, offset))
     | _ => leave(doc, ~after=true)
     }
   | (None, None) => doc
@@ -543,9 +543,9 @@ let right = (doc: Doc.t, ~enters: enters): Doc.t =>
 // Moves the caret one character back, the mirror of `right`.
 let left = (doc: Doc.t, ~enters: enters): Doc.t =>
   switch (doc.editing, doc.selection) {
-  | (Some({entry, offset}), _) =>
-    switch doc.entries->Dict.get(entry) {
-    | Some(text) if offset > 0 => enter(doc, ~id=entry, ~offset=Runs.back(text.text, offset))
+  | (Some({atom, offset}), _) =>
+    switch doc.atoms->Dict.get(atom) {
+    | Some(text) if offset > 0 => enter(doc, ~id=atom, ~offset=Runs.back(text.text, offset))
     | _ => leave(doc, ~after=false)
     }
   | (None, None) => doc
@@ -610,16 +610,16 @@ let moveDown = (doc: Doc.t): Doc.t =>
     to + 1 >= doc.blocks->Array.length ? doc : moveBlocks(doc, ~from, ~to, ~by=1)
   }
 
-// The references in pasted blocks that name an entry the document holds,
+// The references in pasted blocks that name an atom the document holds,
 // one per reference in order. Each is copied under an id the caller mints,
-// so two references never share one entry by accident.
+// so two references never share one atom by accident.
 let adopted = (doc: Doc.t, ~blocks: array<Doc.text>): array<Doc.id> =>
   blocks->Array.flatMap(text =>
     text.marks
     ->Array.toSorted((a, b) => Int.compare(a.start, b.start))
     ->Array.filterMap(mark =>
       switch mark.kind {
-      | Ref(id) if doc.entries->Dict.has(id) => Some(id)
+      | Ref(id) if doc.atoms->Dict.has(id) => Some(id)
       | _ => None
       }
     )
@@ -658,37 +658,37 @@ let renamed = (text: Doc.text, ~take: Doc.id => option<Doc.id>): Doc.text => {
 // pasted block joins the text before the caret, the last joins the text
 // after, both the way a join does, and the rest sit between as new blocks.
 // The new blocks take `ids`, one per block after the first, and the copied
-// entries take `entryIds`, one per adopted reference, both minted by the
-// caller. A reference to an entry the document does not hold stays as it
+// atoms take `atomIds`, one per adopted reference, both minted by the
+// caller. A reference to an atom the document does not hold stays as it
 // is. The caret lands at the end of what was pasted.
 let rec paste = (
   doc: Doc.t,
   ~blocks: array<Doc.text>,
   ~ids: array<Doc.id>,
-  ~entryIds: array<Doc.id>=[],
+  ~atomIds: array<Doc.id>=[],
 ): Doc.t =>
   switch doc.selection {
   | None => doc
   | Some(selection) if !collapsed(selection) =>
-    paste(deleteRange(doc, selection), ~blocks, ~ids, ~entryIds)
+    paste(deleteRange(doc, selection), ~blocks, ~ids, ~atomIds)
   | Some({focus: {block, offset}}) =>
     let olds = adopted(doc, ~blocks)
-    if entryIds->Array.length != olds->Array.length {
-      panic("paste takes one entry id for every reference it copies")
+    if atomIds->Array.length != olds->Array.length {
+      panic("paste takes one atom id for every reference it copies")
     }
-    let entries = doc.entries->Dict.copy
+    let atoms = doc.atoms->Dict.copy
     let next = ref(0)
     let take = old =>
-      switch doc.entries->Dict.get(old) {
-      | Some(entry) =>
-        let fresh = entryIds->Array.getUnsafe(next.contents)
+      switch doc.atoms->Dict.get(old) {
+      | Some(atom) =>
+        let fresh = atomIds->Array.getUnsafe(next.contents)
         next := next.contents + 1
-        entries->Dict.set(fresh, entry)
+        atoms->Dict.set(fresh, atom)
         Some(fresh)
       | None => None
       }
     let blocks = blocks->Array.map(text => renamed(text, ~take))
-    let doc = {...doc, entries}
+    let doc = {...doc, atoms}
     let index = indexOf(doc, block)
     let content = blockAt(doc, index).content
     let count = blocks->Array.length
@@ -732,24 +732,24 @@ let rec paste = (
     }
   }
 
-// Sets the text of an entry. No block changes: the blocks hold references.
-// When the entry's box is open, its caret lands at `offset`, the end of the
+// Sets the text of an atom. No block changes: the blocks hold references.
+// When the atom's box is open, its caret lands at `offset`, the end of the
 // text when none is given.
 let edit = (doc: Doc.t, ~id: Doc.id, ~text: string, ~offset=?): Doc.t =>
-  switch doc.entries->Dict.get(id) {
-  | Some(entry) =>
-    let entries = doc.entries->Dict.copy
-    entries->Dict.set(id, {...entry, text})
+  switch doc.atoms->Dict.get(id) {
+  | Some(atom) =>
+    let atoms = doc.atoms->Dict.copy
+    atoms->Dict.set(id, {...atom, text})
     let editing = switch doc.editing {
-    | Some({entry}) if entry == id =>
-      Some({Doc.entry: id, offset: offset->Option.getOr(text->String.length)})
+    | Some({atom}) if atom == id =>
+      Some({Doc.atom: id, offset: offset->Option.getOr(text->String.length)})
     | other => other
     }
-    {...doc, entries, editing}
-  | None => panic(`The entry ${id} is not in the document`)
+    {...doc, atoms, editing}
+  | None => panic(`The atom ${id} is not in the document`)
   }
 
-// Mints an entry under `id`, which the caller minted, and places its
+// Mints an atom under `id`, which the caller minted, and places its
 // reference at the caret, over the selection when there is one. The caret
 // lands after the atom.
 let rec insert = (doc: Doc.t, ~id: Doc.id, ~type_: string, ~text: string): Doc.t =>
@@ -770,11 +770,11 @@ let rec insert = (doc: Doc.t, ~id: Doc.id, ~type_: string, ~text: string): Doc.t
       },
     )
     let offset = offset + reference->String.length
-    let entries = doc.entries->Dict.copy
-    entries->Dict.set(id, {type_, text})
+    let atoms = doc.atoms->Dict.copy
+    atoms->Dict.set(id, {type_, text})
     {
       ...replace(doc, index, content),
-      entries,
+      atoms,
       selection: caret(block, offset, Runs.placed(content, offset)),
     }
   }

@@ -28,20 +28,20 @@ const keys = {
   escape: "Escape",
 }
 
-// The entries of a scenario, with the box's caret: a pipe in an entry's
+// The atoms of a scenario, with the box's caret: a pipe in an atom's
 // text is the caret, as the model's harness reads it.
-const entriesOf = given => {
-  const entries = {}
+const atomsOf = given => {
+  const atoms = {}
   let editing = null
-  for (const [id, entry] of Object.entries(given ?? {})) {
-    const at = entry.text.indexOf("|")
-    if (at === -1) entries[id] = entry
+  for (const [id, atom] of Object.entries(given ?? {})) {
+    const at = atom.text.indexOf("|")
+    if (at === -1) atoms[id] = atom
     else {
-      editing = {entry: id, offset: at}
-      entries[id] = {...entry, text: entry.text.replace("|", "")}
+      editing = {atom: id, offset: at}
+      atoms[id] = {...atom, text: atom.text.replace("|", "")}
     }
   }
-  return {entries, editing}
+  return {atoms, editing}
 }
 
 // `heading(n)` is Cmd+Alt and the digit of its level.
@@ -147,7 +147,7 @@ const twoParts = argument => {
 // `edit(id, text)` as the box's source replaced. When the box is open the
 // source is typed over in place; otherwise a click on the atom opens it,
 // and Escape closes it after.
-async function editEntry(page, argument, open) {
+async function editAtom(page, argument, open) {
   const [id, text] = twoParts(argument)
   if (!open) await page.click(`[data-ref="${id}"]`)
   await page.waitForSelector(".box__source")
@@ -157,7 +157,7 @@ async function editEntry(page, argument, open) {
 }
 
 // `insert(math, text)` as Cmd+M, the source typed into the box, and Escape.
-async function insertEntry(page, argument) {
+async function insertAtom(page, argument) {
   const [, text] = twoParts(argument)
   await page.keyboard.press("ControlOrMeta+m")
   await page.waitForSelector(".box__source")
@@ -184,18 +184,18 @@ for (const file of readdirSync(dir).filter(name => name.endsWith(".yaml"))) {
         await page.goto("/", {waitUntil: "domcontentloaded"})
         await page.waitForSelector("#block-a")
         await page.locator(".editor").focus()
-        const {entries, editing} = entriesOf(example.entries)
+        const {atoms, editing} = atomsOf(example.atoms)
         await page.evaluate(
-          ([source, entries, editing]) => window.editor.load(source, entries, editing),
-          [example.before, entries, editing],
+          ([source, atoms, editing]) => window.editor.load(source, atoms, editing),
+          [example.before, atoms, editing],
         )
         await settle(page)
         for (const act of acts(example.when)) {
           const {name, argument} = act
           if (name === "input") await typeInput(page, argument)
           else if (name === "click") await click(page, argument)
-          else if (name === "edit") await editEntry(page, argument, editing !== null)
-          else if (name === "insert") await insertEntry(page, argument)
+          else if (name === "edit") await editAtom(page, argument, editing !== null)
+          else if (name === "insert") await insertAtom(page, argument)
           else await page.keyboard.press(keyFor(act))
           await settle(page)
         }
@@ -203,9 +203,9 @@ for (const file of readdirSync(dir).filter(name => name.endsWith(".yaml"))) {
         const expected = write(after.doc, after.labeled)
         const got = await page.evaluate(labels => window.editor.notation(labels), after.labeled)
         expect(got).toBe(expected)
-        if (example.entriesAfter) {
-          const wanted = entriesOf(example.entriesAfter)
-          expect(await page.evaluate(() => window.editor.entries())).toEqual(wanted.entries)
+        if (example.atomsAfter) {
+          const wanted = atomsOf(example.atomsAfter)
+          expect(await page.evaluate(() => window.editor.atoms())).toEqual(wanted.atoms)
           expect((await page.evaluate(() => window.editor.editing())) ?? null).toEqual(wanted.editing)
         }
       })

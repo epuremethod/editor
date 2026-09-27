@@ -49,20 +49,20 @@ const initial = {Bold: "B", Italic: "I", Code: "`", Link: "K"}
 
 // An atom, drawn the way the editor draws it: a formula through KaTeX,
 // inline or in display mode by its block's form, any other type as its
-// source, and a reference to no entry as itself. The card shows what the
+// source, and a reference to no atom as itself. The card shows what the
 // person sees, never the source in the line.
-function atom(id, entries, display) {
-  const entry = entries[id]
+function atom(id, atoms, display) {
+  const atom = atoms[id]
   const inner =
-    entry === undefined
+    atom === undefined
       ? `<span class="tree__missing">${escape(`{{${id}}}`)}</span>`
-      : entry.type === "math"
-        ? katex.renderToString(entry.text.replace("|", ""), {displayMode: display, throwOnError: false})
-        : `<span class="tree__source">${escape(entry.text.replace("|", ""))}</span>`
+      : atom.type === "math"
+        ? katex.renderToString(atom.text.replace("|", ""), {displayMode: display, throwOnError: false})
+        : `<span class="tree__source">${escape(atom.text.replace("|", ""))}</span>`
   return `<span class="tree__atom${display ? " tree__atom--display" : ""}">${inner}</span>`
 }
 
-function wrap(mark, inner, {entries, display}) {
+function wrap(mark, inner, {atoms, display}) {
   switch (name(mark.kind)) {
     case "Bold":
       return `<strong>${inner}</strong>`
@@ -71,7 +71,7 @@ function wrap(mark, inner, {entries, display}) {
     case "Code":
       return `<code>${inner}</code>`
     case "Ref":
-      return atom(mark.kind._0, entries, display)
+      return atom(mark.kind._0, atoms, display)
     default:
       return `<a href="${escape(mark.kind._0)}">${inner}</a>`
   }
@@ -93,9 +93,9 @@ function caretHtml(content, at, pending) {
   return `<span class="tree__caret"></span>${shown ? `<span class="tree__pending">${label}</span>` : ""}`
 }
 
-function text(doc, block, entries = {}) {
+function text(doc, block, atoms = {}) {
   const content = block.content
-  const context = {entries, display: block.form === "Display"}
+  const context = {atoms, display: block.form === "Display"}
   const {caret, pending, range} = within(doc, block)
   const cuts = new Set([0, content.text.length])
   content.marks.forEach(mark => cuts.add(mark.start).add(mark.stop))
@@ -124,7 +124,7 @@ function lead(block) {
   return ""
 }
 
-// The entries under a document: id, type and source. A pipe in a source is
+// The atoms under a document: id, type and source. A pipe in a source is
 // the box's caret, drawn as the caret is drawn in a block.
 function sourceHtml(text) {
   const at = text.indexOf("|")
@@ -132,22 +132,22 @@ function sourceHtml(text) {
   return `${escape(text.slice(0, at))}<span class="tree__caret"></span>${escape(text.slice(at + 1))}`
 }
 
-function listed(entries) {
-  const rows = Object.entries(entries ?? {}).map(
-    ([id, entry]) =>
-      `<div class="tree__entry${entry.text.includes("|") ? " tree__entry--open" : ""}"><span class="tree__id">${escape(id)}</span><span class="tree__type">${escape(entry.type)}</span><span class="tree__source">${sourceHtml(entry.text)}</span></div>`,
+function listed(atoms) {
+  const rows = Object.entries(atoms ?? {}).map(
+    ([id, atom]) =>
+      `<div class="tree__atom${atom.text.includes("|") ? " tree__atom--open" : ""}"><span class="tree__id">${escape(id)}</span><span class="tree__type">${escape(atom.type)}</span><span class="tree__source">${sourceHtml(atom.text)}</span></div>`,
   )
-  return rows.length ? `<div class="tree__entries">${rows.join("")}</div>` : ""
+  return rows.length ? `<div class="tree__atoms">${rows.join("")}</div>` : ""
 }
 
-function tree(doc, entries) {
+function tree(doc, atoms) {
   const blocks = doc.blocks
     .map(
       block =>
-        `<li class="tree__block"><span class="tree__id">${escape(block.id)}</span><span class="tree__text${typeof block.form === "object" ? " tree__text--heading" : ""}">${lead(block)}${text(doc, block, entries) || '<span class="tree__empty">—</span>'}</span></li>`,
+        `<li class="tree__block"><span class="tree__id">${escape(block.id)}</span><span class="tree__text${typeof block.form === "object" ? " tree__text--heading" : ""}">${lead(block)}${text(doc, block, atoms) || '<span class="tree__empty">—</span>'}</span></li>`,
     )
     .join("")
-  return `<ol class="tree">${blocks}</ol>${listed(entries)}`
+  return `<ol class="tree">${blocks}</ol>${listed(atoms)}`
 }
 
 // The argument of `input`, plain text with its caret, drawn the way a block
@@ -158,10 +158,10 @@ function line(source) {
 }
 
 // The argument of `paste`, a document in the notation, drawn one block a
-// line, its references drawn from the entries the section holds.
-function lines(source, entries) {
+// line, its references drawn from the atoms the section holds.
+function lines(source, atoms) {
   const {doc} = read(source)
-  return doc.blocks.map(block => text(doc, block, entries)).join("\n")
+  return doc.blocks.map(block => text(doc, block, atoms)).join("\n")
 }
 
 const actLine = /^(\w+|->|<-)(?:\((.*)\))?$/s
@@ -212,12 +212,12 @@ function acts(when) {
     .join("")
 }
 
-function arguments_(when, entries) {
+function arguments_(when, atoms) {
   const rows = parsed(when).map(({name, argument}) => {
     const shown =
       argument === undefined
         ? ""
-        : `<span class="op__argument-text">${name === "input" ? line(argument) : name === "paste" ? lines(argument, entries) : escape(argument)}</span>`
+        : `<span class="op__argument-text">${name === "input" ? line(argument) : name === "paste" ? lines(argument, atoms) : escape(argument)}</span>`
     return `<div class="op__argument"><kbd class="op__act-name">${escape(name)}</kbd>${shown}</div>`
   })
   return `<div class="op__arguments">${rows.join("")}</div>`
@@ -231,17 +231,17 @@ function card(example, feature) {
   }
   const before = read(example.before).doc
   const after = read(example.after).doc
-  const entries = example.entries ?? {}
-  const entriesAfter = example.entriesAfter ?? entries
+  const atoms = example.atoms ?? {}
+  const atomsAfter = example.atomsAfter ?? atoms
   return [
     `<figure class="op" id="${slugify(example.scenario)}">`,
     `<figcaption class="op__head"><span class="op__title">${escape(example.scenario)}</span><span class="op__feature">${escape(feature)}</span></figcaption>`,
     '<div class="op__grid">',
-    `<section class="op__side op__side--before"><p class="op__label">Before</p>${tree(before, entries)}</section>`,
+    `<section class="op__side op__side--before"><p class="op__label">Before</p>${tree(before, atoms)}</section>`,
     `<div class="op__act">${acts(example.when)}</div>`,
-    `<section class="op__side op__side--after"><p class="op__label">After</p>${tree(after, entriesAfter)}</section>`,
+    `<section class="op__side op__side--after"><p class="op__label">After</p>${tree(after, atomsAfter)}</section>`,
     "</div>",
-    arguments_(example.when, entries),
+    arguments_(example.when, atoms),
     "</figure>",
   ].join("")
 }

@@ -96,7 +96,7 @@ let read = (source: string, ~plain=false): read => {
     }
     seen->Set.add(block.id)
   })
-  {doc: {blocks, selection, entries: Dict.make(), editing: None}, labeled: labeled.contents}
+  {doc: {blocks, selection, atoms: Dict.make(), editing: None}, labeled: labeled.contents}
 }
 
 // The markers a block writes: its caret, or the end of the selection it

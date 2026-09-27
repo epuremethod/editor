@@ -11,7 +11,7 @@ type state = {
   // instead of patching what the browser already touched.
   mutable revisions: dict<int>,
   mutable composing: bool,
-  // The entry whose type's widget is open under its atom, if any. The
+  // The atom whose type's widget is open under its atom, if any. The
   // box is the model's state; a widget is the view's.
   mutable widget: option<Doc.id>,
 }
@@ -31,17 +31,13 @@ let load = (state: state, doc: Doc.t) => {
   state.doc = doc
 }
 
-// How an entry draws, by its type, inline or as a display.
-type render = (Doc.entry, ~display: bool) => React.element
+// How an atom draws, by its type, inline or as a display.
+type render = (Doc.atom, ~display: bool) => React.element
 
 // A type's own editor, opened by a click on its atom and placed under it
-// by the editor: it takes the entry, a way to change its text, and a way
+// by the editor: it takes the atom, a way to change its text, and a way
 // to close.
-type widget = (
-  ~entry: Doc.entry,
-  ~onChange: string => unit,
-  ~onClose: unit => unit,
-) => React.element
+type widget = (~atom: Doc.atom, ~onChange: string => unit, ~onClose: unit => unit) => React.element
 
 // What the host knows about a type. A type with `render` alone enters the
 // editor's box under the arrows and on a click. A type with a widget
@@ -49,17 +45,17 @@ type widget = (
 // false skips and opens nothing.
 type spec = {render: render, enter?: bool, widget?: widget}
 
-let plain: render = (entry, ~display as _) =>
-  <span className="source"> {React.string(entry.text)} </span>
+let plain: render = (atom, ~display as _) =>
+  <span className="source"> {React.string(atom.text)} </span>
 
-// The spec of an entry's type; a type the host did not name shows its
+// The spec of an atom's type; a type the host did not name shows its
 // source and enters.
-let specOf = (types: dict<spec>, entry: Doc.entry) =>
-  types->Dict.get(entry.type_)->Option.getOr({render: plain})
+let specOf = (types: dict<spec>, atom: Doc.atom) =>
+  types->Dict.get(atom.type_)->Option.getOr({render: plain})
 
 let entersOf = (types: dict<spec>): Edit.enters =>
-  entry => {
-    let spec = specOf(types, entry)
+  atom => {
+    let spec = specOf(types, atom)
     spec.enter->Option.getOr(spec.widget->Option.isNone)
   }
 
@@ -127,14 +123,14 @@ module Floater = {
 @set external selectionEnd: (Dom.element, int) => unit = "selectionEnd"
 @get external selectionAt: Dom.element => int = "selectionStart"
 
-// The box: the entry's source as plain text, with the model's caret in it.
-// Every keystroke is an act on the entry, and the atom follows it live.
+// The box: the atom's source as plain text, with the model's caret in it.
+// Every keystroke is an act on the atom, and the atom follows it live.
 // The arrows are the model's, so the edges of the source are its to
 // decide; Escape leaves after the atom.
 module Box = {
   @react.component
   let make = (
-    ~entry: Doc.entry,
+    ~atom: Doc.atom,
     ~offset: int,
     ~onChange: (string, int) => unit,
     ~onKey: string => bool,
@@ -162,7 +158,7 @@ module Box = {
     <textarea
       className="box__source"
       ref={ReactDOM.Ref.domRef(source)}
-      value=entry.text
+      value=atom.text
       rows=1
       onChange={event => {
         let node = ReactEvent.Form.target(event)
@@ -183,9 +179,26 @@ module Box = {
   }
 }
 
-let mint = () => {
-  let stamp = Date.now()->Float.toString
-  `b${stamp->String.slice(~start=-6)}${(Math.random() *. 1000.)->Float.toInt->Int.toString}`
+// An id for a block or an atom: four characters of base36, unique in the
+// document and among the ids this mint handed out and the document has not
+// taken yet, since a paste asks for several before any lands.
+let alphabet = "0123456789abcdefghijklmnopqrstuvwxyz"
+
+let fresh = (taken: string => bool) => {
+  let handed = Set.make()
+  let rec next = () => {
+    let id =
+      Array.fromInitializer(~length=4, _ =>
+        alphabet->String.charAt((Math.random() *. 36.)->Float.toInt)
+      )->Array.join("")
+    if taken(id) || handed->Set.has(id) {
+      next()
+    } else {
+      handed->Set.add(id)
+      id
+    }
+  }
+  next
 }
 
 // The block element holding a node and its id. A text node has no
@@ -258,22 +271,22 @@ let wrap = (kind: Doc.kind, inner: React.element) =>
   | Ref(_) => inner
   }
 
-// An atom: the entry a reference names, drawn by its type, and never edited
+// An atom: the atom a reference names, drawn by its type, and never edited
 // by the browser. `data-atom` holds the reference's characters, so the atom
-// counts as them. A reference to no entry draws as a placeholder. A mouse
+// counts as them. A reference to no atom draws as a placeholder. A mouse
 // down opens the box.
 module Atom = {
   @react.component
   let make = (
     ~id: Doc.id,
     ~text: string,
-    ~entry: option<Doc.entry>,
+    ~atom: option<Doc.atom>,
     ~display: bool,
     ~render: render,
     ~onOpen: Doc.id => unit,
   ) => {
-    let drawn = switch entry {
-    | Some(entry) => render(entry, ~display)
+    let drawn = switch atom {
+    | Some(atom) => render(atom, ~display)
     | None => <span className="atom__missing"> {React.string(text)} </span>
     }
     // The data attributes are set on the node: JSX types no `data-` prop.
@@ -313,7 +326,7 @@ module Block = {
   @react.component
   let make = (
     ~block: Doc.block,
-    ~entries: dict<Doc.entry>,
+    ~atoms: dict<Doc.atom>,
     ~render: render,
     ~onOpen: Doc.id => unit,
   ) => {
@@ -335,7 +348,7 @@ module Block = {
               <Atom
                 id=ref
                 text
-                entry={entries->Dict.get(ref)}
+                atom={atoms->Dict.get(ref)}
                 display={block.form == Display}
                 render
                 onOpen
@@ -405,27 +418,30 @@ let make = (
   ~state: state,
   ~section: Section.t,
   ~storage: Section.storage,
-  ~mint: unit => string=mint,
-  ~mintEntry: unit => string=mint,
+  ~mint: option<unit => string>=?,
+  ~mintAtom: option<unit => string>=?,
   ~types: dict<spec>=Dict.make(),
 ) => {
   TiliaReact.useTilia()
+  let own = React.useMemo0(() =>
+    fresh(id => Doc.block(state.doc, id)->Option.isSome || state.doc.atoms->Dict.has(id))
+  )
+  let mint = mint->Option.getOr(own)
+  let mintAtom = mintAtom->Option.getOr(own)
   let root = React.useRef(Nullable.null)
   let enters = entersOf(types)
-  let render: render = (entry, ~display) => specOf(types, entry).render(entry, ~display)
+  let render: render = (atom, ~display) => specOf(types, atom).render(atom, ~display)
 
   // Applies an act. A block whose content changed is rebuilt, and so is a
-  // block whose atom's entry changed. The section goes to the host when
-  // any content or entry changed.
+  // block whose atom's atom changed. The section goes to the host when
+  // any content or atom changed.
   let apply = (act: Doc.t => Doc.t) => {
     let before = state.doc
     let after = act(before)
-    let changedEntries =
-      after.entries
+    let changedAtoms =
+      after.atoms
       ->Dict.toArray
-      ->Array.filterMap(((id, entry)) =>
-        before.entries->Dict.get(id) == Some(entry) ? None : Some(id)
-      )
+      ->Array.filterMap(((id, atom)) => before.atoms->Dict.get(id) == Some(atom) ? None : Some(id))
     let changed = after.blocks->Array.filter(block =>
       switch Doc.block(before, block.id) {
       | Some(old) =>
@@ -433,7 +449,7 @@ let make = (
         old.form != block.form ||
         block.content.marks->Array.some(mark =>
           switch mark.kind {
-          | Ref(id) => changedEntries->Array.includes(id)
+          | Ref(id) => changedAtoms->Array.includes(id)
           | _ => false
           }
         )
@@ -445,7 +461,7 @@ let make = (
     if (
       changed->Array.length > 0 ||
       after.blocks->Array.length != before.blocks->Array.length ||
-      after.entries != before.entries
+      after.atoms != before.atoms
     ) {
       storage.update([Storage.write(after, ~id=section.id)])
     }
@@ -464,12 +480,12 @@ let make = (
         }
       )
     )
-    switch state.doc.entries->Dict.get(id) {
-    | Some(entry) =>
-      let spec = specOf(types, entry)
+    switch state.doc.atoms->Dict.get(id) {
+    | Some(atom) =>
+      let spec = specOf(types, atom)
       if spec.widget->Option.isSome {
         state.widget = Some(id)
-      } else if enters(entry) {
+      } else if enters(atom) {
         apply(doc => Edit.enter(doc, ~id))
       }
     | None => ()
@@ -560,8 +576,8 @@ let make = (
         text->String.split("\n")->Array.map(line => Inline.read(line, ~notation=false).text)
       let ids = blocks->Array.slice(~start=1, ~end=blocks->Array.length)->Array.map(_ => mint())
       apply(doc => {
-        let entryIds = Edit.adopted(doc, ~blocks)->Array.map(_ => mintEntry())
-        Edit.paste(doc, ~blocks, ~ids, ~entryIds)
+        let atomIds = Edit.adopted(doc, ~blocks)->Array.map(_ => mintAtom())
+        Edit.paste(doc, ~blocks, ~ids, ~atomIds)
       })
     | _ if across(doc) =>
       // A text-level edit over a selection across blocks: the range goes,
@@ -622,7 +638,7 @@ let make = (
     // Cmd+M inserts a formula at the caret and opens its box.
     | "m" if command =>
       event->ReactEvent.Keyboard.preventDefault
-      let id = mintEntry()
+      let id = mintAtom()
       apply(doc => Edit.insert(doc, ~id, ~type_="math", ~text="")->Edit.enter(~id, ~offset=0))
     | "ArrowUp" if command && event->ReactEvent.Keyboard.shiftKey =>
       event->ReactEvent.Keyboard.preventDefault
@@ -722,12 +738,12 @@ let make = (
       ->Option.flatMap(root => root->Browser.query(`[data-ref="${id}"]`)->Nullable.toOption)
 
   let box = switch state.doc.editing {
-  | Some({entry: id, offset}) =>
-    switch state.doc.entries->Dict.get(id) {
-    | Some(entry) =>
+  | Some({atom: id, offset}) =>
+    switch state.doc.atoms->Dict.get(id) {
+    | Some(atom) =>
       <Floater key=id anchor={anchorOf(id)} className="box">
         <Box
-          entry
+          atom
           offset
           onChange={(text, offset) => apply(doc => Edit.edit(doc, ~id, ~text, ~offset))}
           onKey={key =>
@@ -757,13 +773,13 @@ let make = (
 
   let widget = switch state.widget {
   | Some(id) =>
-    switch state.doc.entries
+    switch state.doc.atoms
     ->Dict.get(id)
-    ->Option.flatMap(entry => specOf(types, entry).widget->Option.map(widget => (entry, widget))) {
-    | Some((entry, widget)) =>
+    ->Option.flatMap(atom => specOf(types, atom).widget->Option.map(widget => (atom, widget))) {
+    | Some((atom, widget)) =>
       <Floater key=id anchor={anchorOf(id)} className="widget">
         {widget(
-          ~entry,
+          ~atom,
           ~onChange=text => apply(doc => Edit.edit(doc, ~id, ~text)),
           ~onClose=() => {
             state.widget = None
@@ -805,7 +821,7 @@ let make = (
               ":" ++
               Int.toString(state.revisions->Dict.get(block.id)->Option.getOr(0))}
               block
-              entries=state.doc.entries
+              atoms=state.doc.atoms
               render
               onOpen=open_
             />

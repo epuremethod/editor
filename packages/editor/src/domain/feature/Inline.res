@@ -14,7 +14,7 @@ type found = {marker: marker, offset: int, kinds: array<Doc.kind>}
 
 type read = {text: Doc.text, markers: array<found>}
 
-type entry = {mutable kind: Doc.kind, start: int}
+type atom = {mutable kind: Doc.kind, start: int}
 
 let fail = message => panic(`Inline: ${message}`)
 
@@ -24,9 +24,9 @@ let reference = /^\{\{([A-Za-z0-9_-]+)\}\}/
 
 let read = (source: string, ~notation=true): read => {
   let text = ref("")
-  let stack: array<entry> = []
+  let stack: array<atom> = []
   let marks: array<Doc.mark> = []
-  let markers: array<(marker, int, array<entry>)> = []
+  let markers: array<(marker, int, array<atom>)> = []
   let index = ref(0)
   let length = source->String.length
   let peek = ahead => source->String.charAt(index.contents + ahead)
@@ -39,12 +39,12 @@ let read = (source: string, ~notation=true): read => {
   let open_ = kind => stack->Array.push({kind, start: text.contents->String.length})
   let close = () =>
     switch stack->Array.pop {
-    | Some(entry) =>
+    | Some(atom) =>
       let stop = text.contents->String.length
-      if stop > entry.start {
-        marks->Array.push({kind: entry.kind, start: entry.start, stop})
+      if stop > atom.start {
+        marks->Array.push({kind: atom.kind, start: atom.start, stop})
       }
-      entry
+      atom
     | None => fail("a closing delimiter with nothing open")
     }
   let literal = character => text := text.contents ++ character
@@ -126,12 +126,12 @@ let read = (source: string, ~notation=true): read => {
           index := index.contents + 1
         }
       }
-      let entry = close()
-      entry.kind = Link(href.contents)
+      let atom = close()
+      atom.kind = Link(href.contents)
       // The mark was pushed with an empty href; give it the one just read.
       let last = marks->Array.length - 1
       switch marks->Array.get(last) {
-      | Some(mark) if mark.start == entry.start && mark.kind == Link("") =>
+      | Some(mark) if mark.start == atom.start && mark.kind == Link("") =>
         marks->Array.set(last, {...mark, kind: Link(href.contents)})
       | _ => ()
       }
@@ -148,7 +148,7 @@ let read = (source: string, ~notation=true): read => {
     markers: markers->Array.map(((marker, offset, held)) => {
       marker,
       offset,
-      kinds: Runs.sorted(held->Array.map(entry => entry.kind)),
+      kinds: Runs.sorted(held->Array.map(atom => atom.kind)),
     }),
   }
 }

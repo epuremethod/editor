@@ -44,6 +44,52 @@ importers:
         specifier: ^3.2.4
         version: 3.2.7(yaml@2.9.0)
 
+  packages/lapa:
+    dependencies:
+      '@epure/editor':
+        specifier: workspace:^
+        version: link:../editor
+      '@lapa/db':
+        specifier: link:../../../sylva/packages/db
+        version: link:../../../sylva/packages/db
+      '@tilia/editor':
+        specifier: workspace:^
+        version: link:../tilia
+      katex:
+        specifier: ^0.18.9
+        version: 0.18.9
+      lapa:
+        specifier: link:../../../sylva/packages/lapa
+        version: link:../../../sylva/packages/lapa
+    devDependencies:
+      '@lapa/server':
+        specifier: link:../../../sylva/packages/server
+        version: link:../../../sylva/packages/server
+      '@rescript/react':
+        specifier: ^0.15.0
+        version: 0.15.0(@rescript/runtime@12.3.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      '@rescript/runtime':
+        specifier: ^12.3.0
+        version: 12.3.1
+      '@tilia/react':
+        specifier: 6.0.0-beta.20260820T171602
+        version: 6.0.0-beta.20260820T171602(react@19.3.0)
+      react:
+        specifier: ^19.2.0
+        version: 19.3.0
+      react-dom:
+        specifier: ^19.2.0
+        version: 19.3.0(react@19.3.0)
+      rescript:
+        specifier: ^12.3.0
+        version: 12.3.1
+      tilia:
+        specifier: 6.0.0-beta.20260820T171602
+        version: 6.0.0-beta.20260820T171602
+      vite:
+        specifier: ^7.1.0
+        version: 7.3.6(yaml@2.9.0)
+
   packages/tilia:
     dependencies:
       '@epure/editor':

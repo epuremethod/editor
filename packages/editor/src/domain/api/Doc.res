@@ -4,7 +4,7 @@
 type id = string
 
 // What a mark is: bold, italic, a code span, a link to an href, or a
-// reference to an entry by its id. A reference's text is the id between
+// reference to an atom by its id. A reference's text is the id between
 // double braces, so offsets count it like any characters.
 type kind = Bold | Italic | Code | Link(string) | Ref(string)
 
@@ -30,20 +30,20 @@ type point = {block: id, offset: int}
 // has one state per side, and `pending` says which.
 type selection = {anchor: point, focus: point, pending: array<kind>}
 
-// An entry: a type the host knows, and a text the type reads. A formula is
-// an entry of type math whose text is its LaTeX source. The core knows no
+// An atom: a type the host knows, and a text the type reads. A formula is
+// an atom of type math whose text is its LaTeX source. The core knows no
 // type.
-type entry = {@as("type") type_: string, text: string}
+type atom = {@as("type") type_: string, text: string}
 
-// The box: an entry whose source is being edited, and the caret in it. It
+// The box: an atom whose source is being edited, and the caret in it. It
 // exists only for a type that enters. The block selection stays where the
-// box was entered from, and the entry caret is the live one.
-type editing = {entry: id, offset: int}
+// box was entered from, and the atom caret is the live one.
+type editing = {atom: id, offset: int}
 
 type t = {
   blocks: array<block>,
   selection: option<selection>,
-  entries: dict<entry>,
+  atoms: dict<atom>,
   editing: option<editing>,
 }
 

@@ -14,3 +14,7 @@ docs/dist/
 packages/tilia/dist/
 packages/tilia/dist-demo/
 packages/tilia/test-results/
+
+# The croquis: its dev deployment and its bundle.
+packages/lapa/.data/
+packages/lapa/dist/

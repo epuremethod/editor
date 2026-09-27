@@ -26,7 +26,7 @@ sections, because a row may hang under a row of the same class.
 A **section** is a row, and it is the unit of everything social. It is what a
 person shares, drafts, proposes or transcludes. It is also the smallest thing
 lapa syncs, merges and reaches on its own. A section keeps its blocks in one
-field and its entries in another. The definition of a topology with its three
+field and its atoms in another. The definition of a topology with its three
 axioms is a section. The proof of a theorem is a section. A section has no
 heading level and no nesting. Its heading, when it has one, is a block inside
 it.
@@ -45,27 +45,24 @@ mark is a kind, such as bold, italic, code or link, over a span of the plain
 text, counted in characters. The **caret** and the **selection** are offsets
 in the same plain text, so they map onto the rendered text one to one.
 
-An **entry** is one element of the second field: a type and a text. A formula
-is an entry of type math, and its text is the LaTeX source. A video is an
-entry of type video, and its text names the row and its placement. The
-**entries** of a section are a dictionary keyed by id, and the editor mints
-those ids as it mints a block's. A **type** is what the host knows about an
-entry: how to draw it, and how to merge two copies of it. The core knows no
-type.
+An **atom** is one element of the second field: a type and a text, and the
+one piece drawn from them that the browser may not edit. A formula is an atom
+of type math, and its text is the LaTeX source. A video is an atom of type
+video, and its text names the row and its placement. The **atoms** of a
+section are a dictionary keyed by id, and the editor mints those ids as it
+mints a block's. A **type** is what the host knows about an atom: how to draw
+it, and how to merge two copies of it. The core knows no type.
 
-A **reference** is how a block holds an entry: `{{`a8f1`}}`, the id between
+A **reference** is how a block holds an atom: `{{`a8f1`}}`, the id between
 double braces, as characters of the plain text under a mark of its own. A
 reference inside a sentence is inline. A reference alone in a display block
-is a block. The entry is the same in both, and its text never sits in the
-block.
-
-An **atom** is what a reference draws: one piece the browser may not edit,
-the entry rendered by its type for its place, inline or display. The caret
-sits before or after an atom, never inside. The text of an entry is edited in
-a box the editor opens under its atom.
+is a block. The atom is the same in both, drawn by its type for its place,
+and its text never sits in the block. The caret sits before or after an atom,
+never inside. The text of an atom is edited in a box the editor opens under
+it.
 
 **Expansion** is for later. A type may answer a reference with more text to
-read, so that a template names other entries, and a letter or a résumé is
+read, so that a template names other atoms, and a letter or a résumé is
 written from one. The word is settled here, and nothing on this page uses it
 yet.
 
@@ -167,9 +164,9 @@ A keyed array merges entry by entry first, and as texts second. Against the
 base, every entry outside the longest run still in base order has moved, and
 each side's moves are played after the entry before them. Then every id
 whose text changed on both sides runs diff3 over its words, with git markers
-where both sides changed one stretch. The entries of a section are a second
+where both sides changed one stretch. The atoms of a section are a second
 keyed array and merge the same way. So a conflict lands on one block or one
-entry, not on the section, and the view can show it in place. How a block
+atom, not on the section, and the view can show it in place. How a block
 draws the markers it received is still open.
 
 The shapes to name are few. Edited here and deleted there is a conflict.
@@ -250,7 +247,7 @@ contentEditable root, one paragraph per block, keyed by the block's id. A
 paragraph holds exactly the plain text of its block, wrapped in the tags its
 marks call for and nothing else: no marker characters. That keeps the offset
 map one to one. An atom is the one exception, and it keeps the map by a
-rule: the element that draws an entry counts as the characters of its
+rule: the element that draws an atom counts as the characters of its
 reference, whatever it shows, and the caret sits before or after it. Chrome
 holds no caret beside an atom at the edge of a block unless a text node
 stands there, so a zero-width space is written on each side of an atom, and
@@ -360,7 +357,7 @@ a few rows for its videos in one batch, and the batch must be comfortable.
 
 Undo is not built yet. It will be an editor stack of model edits, one per
 session, because browser undo breaks across re-renders and across rows. Each
-entry will store the inverse edit and the selection before it, so undo
+step will store the inverse edit and the selection before it, so undo
 restores both the text and the caret. Today the browser's undo is prevented
 and does nothing.
 

@@ -515,8 +515,8 @@ body {
   box-shadow: inset 0 -2px 0 var(--red);
 }
 
-/* An atom on a card: the entry drawn by its type, as the editor draws it.
-   The entries of the scenario sit under the tree. */
+/* An atom on a card: the atom drawn by its type, as the editor draws it.
+   The atoms of the scenario sit under the tree. */
 
 .tree__atom { display: inline-block; padding: 0 0.1em; border-radius: 2px; box-shadow: inset 0 0 0 1px var(--grey-light); }
 
@@ -526,9 +526,9 @@ body {
 
 .tree__source { font-family: var(--mono); font-size: 0.85em; white-space: pre-wrap; }
 
-.tree__entries { margin: 0.6rem 0 0; display: grid; gap: 0.3rem; }
+.tree__atoms { margin: 0.6rem 0 0; display: grid; gap: 0.3rem; }
 
-.tree__entry {
+.tree__atom {
   display: grid;
   grid-template-columns: 1.5rem auto minmax(0, 1fr);
   gap: 0.6rem;
@@ -537,16 +537,16 @@ body {
   color: var(--grey);
 }
 
-.tree__entry .tree__id { font-size: 0.75rem; line-height: 1.2rem; color: var(--grey); }
+.tree__atom .tree__id { font-size: 0.75rem; line-height: 1.2rem; color: var(--grey); }
 
 .tree__type { font-family: var(--mono); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; }
 
-/* The open entry: a triangle points at it, so nothing beside its caret
+/* The open atom: a triangle points at it, so nothing beside its caret
    looks like a caret. The caret in its source stays thin. */
 
-.tree__entry--open { color: var(--black); position: relative; }
+.tree__atom--open { color: var(--black); position: relative; }
 
-.tree__entry--open::before {
+.tree__atom--open::before {
   content: "";
   position: absolute;
   left: -0.9rem;
@@ -560,7 +560,7 @@ body {
 
 /* The schema: a structure drawn as nested frames. A frame is a row, and a
    frame inside a frame hangs under it. The blocks of a section are drawn
-   the way a plate draws them, so a row and an entry never look alike. */
+   the way a plate draws them, so a row and an atom never look alike. */
 
 .schema {
   margin: 1.8rem 0 2.2rem;
@@ -714,7 +714,7 @@ body {
 
 .prose #demo-port { min-height: 3rem; }
 
-/* An atom draws an entry and is never edited in place; a click opens the
+/* An atom draws an atom and is never edited in place; a click opens the
    box under it, where its source is edited as text. */
 
 .prose .editor .atom { display: inline-block; cursor: pointer; border-radius: 2px; }

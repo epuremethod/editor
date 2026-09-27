@@ -1,7 +1,7 @@
 // The `schema` fence: a structure, drawn. The body is an outline. A line
 // that starts with a capitalized word is a row of that class, and every row
 // indented under another hangs under it. A line that starts with a lowercase
-// id is a block, one entry of the section's keyed array, drawn the way the
+// id is a block, one atom of the section's keyed array, drawn the way the
 // Operations page draws a block. A block whose text starts with `~` is an
 // embed, and the rest of its line names the row it draws. Trailing `[...]`
 // groups are badges.

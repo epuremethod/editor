@@ -3,7 +3,7 @@ background:
   given: an editor
 examples:
   - scenario: display turns a block holding one reference alone into a display block
-    entries:
+    atoms:
       a8f1: {type: math, text: '\emptyset \in \tau \quad\text{and}\quad X \in \tau'}
     before: |
       Two sets are always open:
@@ -14,7 +14,7 @@ examples:
       :: {{a8f1}}|
 
   - scenario: display on a block holding text beside its reference changes nothing
-    entries:
+    atoms:
       a8f1: {type: math, text: '\emptyset \in \tau \quad\text{and}\quad X \in \tau'}
     before: |
       Two sets are always open: {{a8f1}}|
@@ -23,7 +23,7 @@ examples:
       Two sets are always open: {{a8f1}}|
 
   - scenario: paragraph turns a display block back into a paragraph
-    entries:
+    atoms:
       a8f1: {type: math, text: '\emptyset \in \tau \quad\text{and}\quad X \in \tau'}
     before: |
       :: {{a8f1}}|
@@ -32,7 +32,7 @@ examples:
       {{a8f1}}|
 
   - scenario: a display formula under a paragraph is an enter, an insert and the form
-    entries:
+    atoms:
       a8f1: {type: math, text: '\emptyset \in \tau \quad\text{and}\quad X \in \tau'}
     before: |
       Two sets are always open:|
@@ -40,12 +40,12 @@ examples:
     after: |
       Two sets are always open:
       :: {{e1}}|
-    entriesAfter:
+    atomsAfter:
       a8f1: {type: math, text: '\emptyset \in \tau \quad\text{and}\quad X \in \tau'}
       e1: {type: math, text: '\emptyset \in \tau'}
 
   - scenario: a letter typed beside the atom makes the block a paragraph again
-    entries:
+    atoms:
       a8f1: {type: math, text: '\emptyset \in \tau \quad\text{and}\quad X \in \tau'}
     before: |
       :: {{a8f1}}|
@@ -54,7 +54,7 @@ examples:
       {{a8f1}} holds|
 
   - scenario: right from the paragraph above enters the display block before its atom
-    entries:
+    atoms:
       a8f1: {type: math, text: '\emptyset \in \tau \quad\text{and}\quad X \in \tau'}
     before: |
       Two sets are always open:|
@@ -65,7 +65,7 @@ examples:
       :: |{{a8f1}}
 
   - scenario: right again enters the display's box
-    entries:
+    atoms:
       a8f1: {type: math, text: '\emptyset \in \tau \quad\text{and}\quad X \in \tau'}
     before: |
       Two sets are always open:|
@@ -74,11 +74,11 @@ examples:
     after: |
       Two sets are always open:
       :: |{{a8f1}}
-    entriesAfter:
+    atomsAfter:
       a8f1: {type: math, text: '|\emptyset \in \tau \quad\text{and}\quad X \in \tau'}
 
   - scenario: backspace at the start of a display block joins it to the paragraph above, inline
-    entries:
+    atoms:
       a8f1: {type: math, text: '\emptyset \in \tau \quad\text{and}\quad X \in \tau'}
     before: |
       Two sets are always open:
@@ -88,7 +88,7 @@ examples:
       Two sets are always open: |{{a8f1}}
 
   - scenario: backspace after the atom selects it
-    entries:
+    atoms:
       a8f1: {type: math, text: '\emptyset \in \tau \quad\text{and}\quad X \in \tau'}
     before: |
       :: {{a8f1}}|
@@ -97,7 +97,7 @@ examples:
       :: {{{a8f1}}}
 
   - scenario: backspace over the selected atom leaves an empty paragraph
-    entries:
+    atoms:
       a8f1: {type: math, text: '\emptyset \in \tau \quad\text{and}\quad X \in \tau'}
     before: |
       :: {{{a8f1}}}
@@ -106,7 +106,7 @@ examples:
       |
 
   - scenario: enter at the end of a display block opens a paragraph under it
-    entries:
+    atoms:
       a8f1: {type: math, text: '\emptyset \in \tau \quad\text{and}\quad X \in \tau'}
     before: |
       :: {{a8f1}}|
@@ -116,7 +116,7 @@ examples:
       |
 
   - scenario: enter at the start of a display block opens a paragraph above it
-    entries:
+    atoms:
       a8f1: {type: math, text: '\emptyset \in \tau \quad\text{and}\quad X \in \tau'}
     before: |
       :: |{{a8f1}}
@@ -125,8 +125,8 @@ examples:
 
       :: |{{a8f1}}
 
-  - scenario: the same entry draws inline in one block and as a display block in another
-    entries:
+  - scenario: the same atom draws inline in one block and as a display block in another
+    atoms:
       a8f1: {type: math, text: '\emptyset \in \tau \quad\text{and}\quad X \in \tau'}
     before: |
       The pair {{a8f1}} is the first axiom.|

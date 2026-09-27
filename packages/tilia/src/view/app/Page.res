@@ -6,31 +6,31 @@ open Course
 
 let state = View.prepare(section)
 let mint = mint(state)
-let mintEntry = mintEntry(state)
+let mintAtom = mintAtom(state)
 
 // The hook a browser test drives: load a document in the notation with its
-// entries, read it back in the notation, and read its entries.
+// atoms, read it back in the notation, and read its atoms.
 type hook = {
-  load: (string, Nullable.t<dict<Doc.entry>>, Nullable.t<Doc.editing>) => unit,
+  load: (string, Nullable.t<dict<Doc.atom>>, Nullable.t<Doc.editing>) => unit,
   notation: bool => string,
-  entries: unit => dict<Doc.entry>,
+  atoms: unit => dict<Doc.atom>,
   editing: unit => Nullable.t<Doc.editing>,
 }
 @set external expose: (Dom.window, hook) => unit = "editor"
 @val external window: Dom.window = "window"
 
 window->expose({
-  load: (source, entries, editing) =>
+  load: (source, atoms, editing) =>
     View.load(
       state,
       {
         ...Notation.read(source).doc,
-        entries: entries->Nullable.toOption->Option.getOr(Dict.make()),
+        atoms: atoms->Nullable.toOption->Option.getOr(Dict.make()),
         editing: editing->Nullable.toOption,
       },
     ),
   notation: labels => Notation.write(state.doc, ~labels),
-  entries: () => state.doc.entries,
+  atoms: () => state.doc.atoms,
   editing: () => state.doc.editing->Nullable.fromOption,
 })
 
@@ -39,7 +39,7 @@ module App = {
   let make = () =>
     <main>
       <h1> {React.string("open sets")} </h1>
-      <View state section storage mint mintEntry types />
+      <View state section storage mint mintAtom types />
       <p className="label"> {React.string("what the port received")} </p>
       <pre className="port" id="port">
         <Received />

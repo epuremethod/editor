@@ -117,3 +117,17 @@ nothing in them is written for the site.
 
 Costs the site config a name in place of a path, and a build error that
 names the transform rather than the file.
+
+## 2026-09-26 — The second field of a section is `atoms`
+
+Supersedes the word entry in "An entry is stored, and a reference names it",
+above; the rule itself stands. An atom is the stored type and text, and the
+piece drawn from them, the way a block is the stored line and the drawn
+paragraph. The fields of a section are `blocks` and `atoms`.
+
+Refused: `entries`. Lapa names every element of a many-field an entry, so a
+block is an entry and the second field was a list of entries, and every
+sentence about the binding had to say which one it meant.
+
+Costs the design page one noun less between a source and its rendering,
+which the words "text" and "draws" now carry.

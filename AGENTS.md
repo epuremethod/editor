@@ -1,3 +1,6 @@
+Read `CONTRIBUTING.md` before changing the project. It holds the épure
+method as it lands here, shared with `../sylva`.
+
 Read `docs/content/pages/EDITOR.md` before changing the editor. It settles
 the vocabulary, the model, the input layer and the order of work.
 
@@ -16,5 +19,13 @@ Write plain, natural English. Use common words, short sentences, active
 voice, and concrete subjects. Put one claim in each sentence. Keep a
 scenario title to one action or assertion.
 
-Stop after each stage the user marks. Show the stage and wait for
-agreement. Agents commit only when asked.
+Use comments only for a domain rule, an external quirk, or an invariant that
+the code and types cannot express. Do not comment fixtures. Put lasting
+rationale in `DECISIONS.md`. Delete stale comments after changing code.
+
+A session follows the order in `CONTRIBUTING.md` and keeps its state in
+`SESSION.md`. Stop after each stage. Show the completed stage and wait for
+agreement. Do not write steps or build before the fixture is agreed.
+
+Agents commit only when asked. Never run `git push`, `git merge`,
+`git rebase`, or `git reset`. Otherwise leave changes in the working tree.

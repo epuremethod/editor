@@ -48,11 +48,11 @@ let section: Section.t = {
     ),
     (
       "p",
-      "A formula is an entry: {{f1}} sits inline, and the same kind of entry alone in a block is a display. Click one to edit its source. Cmd+M inserts a new one, and Cmd+Alt+4 makes a block holding one a display.",
+      "A formula is an atom: {{f1}} sits inline, and the same kind of atom alone in a block is a display. Click one to edit its source. Cmd+M inserts a new one, and Cmd+Alt+4 makes a block holding one a display.",
     ),
     ("q", ":: {{f2}}"),
   ],
-  entries: [
+  atoms: [
     ("f1", "math\nU \\in \\tau"),
     (
       "f2",
@@ -68,21 +68,21 @@ let section: Section.t = {
 type katexOptions = {displayMode: bool, throwOnError: bool}
 @module("katex") external renderToString: (string, katexOptions) => string = "renderToString"
 
-let math: View.render = (entry, ~display) =>
+let math: View.render = (atom, ~display) =>
   <span
     className="math"
     dangerouslySetInnerHTML={{
-      "__html": renderToString(entry.text, {displayMode: display, throwOnError: false}),
+      "__html": renderToString(atom.text, {displayMode: display, throwOnError: false}),
     }}
   />
 
-let video: View.render = (entry, ~display as _) =>
-  <span className="video"> {React.string("▶ " ++ entry.text)} </span>
+let video: View.render = (atom, ~display as _) =>
+  <span className="video"> {React.string("▶ " ++ atom.text)} </span>
 
-let videoWidget: View.widget = (~entry, ~onChange, ~onClose) =>
+let videoWidget: View.widget = (~atom, ~onChange, ~onClose) =>
   <textarea
     className="widget__source"
-    defaultValue=entry.text
+    defaultValue=atom.text
     rows=2
     onChange={event => onChange(ReactEvent.Form.target(event)["value"])}
     onKeyDown={event =>
@@ -133,12 +133,12 @@ let mint = (state: View.state) =>
     free(0)
   }
 
-// The id a new entry takes: `e1`, `e2` and on, the way the harness mints.
-let mintEntry = (state: View.state) =>
+// The id a new atom takes: `e1`, `e2` and on, the way the harness mints.
+let mintAtom = (state: View.state) =>
   () => {
     let rec free = n => {
       let id = `e${Int.toString(n)}`
-      state.doc.entries->Dict.has(id) ? free(n + 1) : id
+      state.doc.atoms->Dict.has(id) ? free(n + 1) : id
     }
     free(1)
   }
