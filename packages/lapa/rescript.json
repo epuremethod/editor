@@ -1,0 +1,49 @@
+{
+  "name": "@lapa/editor",
+  "namespace": "LapaEditor",
+  "sources": [
+    {
+      "dir": "src/domain",
+      "public": [],
+      "subdirs": [
+        {
+          "dir": "api",
+          "public": "all"
+        },
+        {
+          "dir": "feature",
+          "public": "all"
+        }
+      ]
+    },
+    {
+      "dir": "src/design",
+      "subdirs": true,
+      "public": [],
+      "type": "dev"
+    },
+    {
+      "dir": "src/croquis",
+      "subdirs": true,
+      "public": [],
+      "type": "dev"
+    }
+  ],
+  "package-specs": {
+    "module": "esmodule",
+    "in-source": true
+  },
+  "suffix": ".res.mjs",
+  "jsx": {
+    "version": 4
+  },
+  "dependencies": [
+    "lapa",
+    "@lapa/db",
+    "@epure/editor",
+    "@tilia/editor",
+    "tilia",
+    "@tilia/react",
+    "@rescript/react"
+  ]
+}
