@@ -42,6 +42,8 @@
     "@lapa/db",
     "@epure/editor",
     "@tilia/editor",
+    "@lapa/tilia",
+    "@tilia/query",
     "tilia",
     "@tilia/react",
     "@rescript/react"

@@ -15,7 +15,9 @@
   "dependencies": {
     "@epure/editor": "workspace:^",
     "@lapa/db": "link:../../../sylva/packages/db",
+    "@lapa/tilia": "link:../../../sylva/packages/tilia",
     "@tilia/editor": "workspace:^",
+    "@tilia/query": "link:../../../sylva/node_modules/.pnpm/@tilia+query@0.1.0-beta.20260903T083650_4cae32893654861c686da18f0cfc32c9/node_modules/@tilia/query",
     "katex": "^0.18.9",
     "lapa": "link:../../../sylva/packages/lapa"
   },
@@ -27,7 +29,7 @@
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "rescript": "^12.3.0",
-    "tilia": "6.0.0-beta.20260820T171602",
+    "tilia": "link:../../../sylva/node_modules/.pnpm/tilia@6.0.0-beta.20260903T083626_964b66c08dff8fb2fda02cf4094571fa/node_modules/tilia",
     "vite": "^7.1.0"
   }
 }

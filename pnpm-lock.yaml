@@ -52,9 +52,15 @@ importers:
       '@lapa/db':
         specifier: link:../../../sylva/packages/db
         version: link:../../../sylva/packages/db
+      '@lapa/tilia':
+        specifier: link:../../../sylva/packages/tilia
+        version: link:../../../sylva/packages/tilia
       '@tilia/editor':
         specifier: workspace:^
         version: link:../tilia
+      '@tilia/query':
+        specifier: link:../../../sylva/node_modules/.pnpm/@tilia+query@0.1.0-beta.20260903T083650_4cae32893654861c686da18f0cfc32c9/node_modules/@tilia/query
+        version: link:../../../sylva/node_modules/.pnpm/@tilia+query@0.1.0-beta.20260903T083650_4cae32893654861c686da18f0cfc32c9/node_modules/@tilia/query
       katex:
         specifier: ^0.18.9
         version: 0.18.9
@@ -84,8 +90,8 @@ importers:
         specifier: ^12.3.0
         version: 12.3.1
       tilia:
-        specifier: 6.0.0-beta.20260820T171602
-        version: 6.0.0-beta.20260820T171602
+        specifier: link:../../../sylva/node_modules/.pnpm/tilia@6.0.0-beta.20260903T083626_964b66c08dff8fb2fda02cf4094571fa/node_modules/tilia
+        version: link:../../../sylva/node_modules/.pnpm/tilia@6.0.0-beta.20260903T083626_964b66c08dff8fb2fda02cf4094571fa/node_modules/tilia
       vite:
         specifier: ^7.1.0
         version: 7.3.6(yaml@2.9.0)

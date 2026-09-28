@@ -7,9 +7,12 @@ open Editor
 // section. The founder finds or makes it under their Personal node and
 // invites every other member to edit it. A member joins with the admission
 // code in the address, waits for the offer, accepts it onto their Personal
-// node, and edits the same section. Every act writes the record; every
-// delivery naming the section is folded onto the live record and lands on
-// the blocks it changed, and on no other.
+// node, and edits the same section. The section is read through
+// `@lapa/tilia`: the sections under the person's Personal node as one live
+// list, whose first is the one. Every act writes a copy of the record; the
+// binding folds what comes back, own write or other device, onto the live
+// record, and a watch on it lands the fold on the blocks it changed, and on
+// no other.
 
 @val @scope(("window", "location")) external search: string = "search"
 type params
@@ -91,13 +94,7 @@ let titleOf = (entity: Lapa.Entity.t) =>
   | _ => None
   }
 
-let sectionClass = Lapa.klassId(Course.Section.klass)
 
-// The section the store holds under an id, as its class reads it.
-let stored = async (client: Client.t, id: Lapa.id) =>
-  (await found(reply => client.store.get(id, reply)))
-  ->Option.map(Lapa.unpack)
-  ->Option.flatMap(Course.Section.from)
 
 let opening: array<Lapa.entry> = [
   {id: "a", text: "# Open sets"},
@@ -121,27 +118,17 @@ let openingAtoms: array<Lapa.entry> = [
 let save = (client: Client.t, section: Course.Section.t) =>
   outcome(reply => client.ops.upsert(~actor=client.actor, [Course.Section.record(section)], reply))
 
-// The one section: the first the client holds. The founder makes it under
-// their Personal node when none stands; a member holds none until an offer
-// is accepted.
-let section = async (client: Client.t, standing: standing) =>
-  switch (await ofClass(client, sectionClass))->Array.get(0) {
-  | Some(id) =>
-    switch await stored(client, id) {
-    | Some(section) => Some(section)
-    | None => JsError.throwWithMessage("the store lists a section it does not hold")
-    }
-  | None if standing.founder =>
-    let made = Course.Section.make(
+// The founder's first section, under their Personal node.
+let opened = (client: Client.t, standing: standing) =>
+  save(
+    client,
+    Course.Section.make(
       client.context,
       ~under=standing.personal,
       ~section={blocks: opening, atoms: openingAtoms},
       ~titled={title: "Open sets"},
-    )
-    await save(client, made)
-    Some(made)
-  | None => None
-  }
+    ),
+  )
 
 // ── the port ────────────────────────────────────────────────────────────
 
@@ -187,7 +174,8 @@ type opened = {
   state: TiliaEditor.View.state,
   /** The other members, kept by the founder alone. */
   mutable others: array<other>,
-  mutable section: Course.Section.t,
+  /** The live record the binding hands out: every fold lands on it. */
+  section: Course.Section.t,
   mutable storage: Section.storage,
   mutable synced: bool,
   mutable saved: int,
@@ -195,8 +183,8 @@ type opened = {
   mutable received: int,
   /** Blocks a delivery changed on screen. */
   mutable changed: int,
-  /** Deliveries skipped because this device's newer write was still in
-      its outbox: the next echo carries it. */
+  /** Deliveries that met this device's own write still in its outbox: the
+      client answers the outbox's row, so the fold changes nothing. */
   mutable skipped: int,
   /** The section as it was last written: the base a delivery is laid
       against, so a block changed here since then keeps the local text. */
@@ -207,7 +195,7 @@ type opened = {
   mutable quiet: option<timeoutId>,
   /** The cap: started by the first unsaved change, restarted by nothing. */
   mutable cap: option<timeoutId>,
-  /** Blocks a delivery left alone because they had changed here since the
+  /** Blocks a fold left alone because they had changed here since the
       last write. */
   mutable held: int,
 }
@@ -388,9 +376,8 @@ let editing = (client: Client.t, standing: standing, first: Course.Section.t) =>
       self.cap->Option.forEach(clearTimeout)
       self.quiet = None
       self.cap = None
-      self.section = written(self.section, latest)
       self.base = latest
-      save(client, self.section)
+      save(client, written(self.section, latest))
       ->Promise.thenResolve(() => self.saved = self.saved + 1)
       ->Promise.ignore
     }
@@ -426,21 +413,25 @@ let editing = (client: Client.t, standing: standing, first: Course.Section.t) =>
       ->Promise.ignore
     }
   listed()
-  // A delivery naming the section is folded onto the live record, then
-  // onto the view. A row this device is still writing is left alone: the
-  // row that comes back is older than the outbox, and the next echo carries
-  // what stands.
+  // The binding folds every answer onto the live record, own write or
+  // other device, before any hook hears the delivery. The watch reads the
+  // record's blocks and atoms, so it runs on a fold that moved one of them
+  // and lands the fold on the view.
+  let _ = Tilia.watch(
+    () => port(self.section),
+    _ => {
+      let (changed, held) = arrive(self.state, self.section, ~base=self.base)
+      self.changed = self.changed + changed
+      self.held = self.held + held
+    },
+  )
+  // The deliveries are counted, and nothing else is done with them here.
   let _ = client.receives(delivery => {
     delivery.entities->Array.forEach(arrival =>
       if Lapa.recordId(Lapa.unpack(arrival.remote)) == self.section.entity.id {
         self.received = self.received + 1
-        switch arrival.edit {
-        | Some(_) => self.skipped = self.skipped + 1
-        | None =>
-          Lapa.assign(self.section, arrival.remote)
-          let (changed, held) = arrive(self.state, self.section, ~base=self.base)
-          self.changed = self.changed + changed
-          self.held = self.held + held
+        if arrival.edit->Option.isSome {
+          self.skipped = self.skipped + 1
         }
       }
     )
@@ -484,40 +475,49 @@ let failed = error =>
     error->JsExn.fromException->Option.flatMap(JsExn.message)->Option.getOr("unknown"),
   )
 
+// The sections under the person's Personal node, as the binding answers
+// them: the founder's own, and the one an accepted offer lands there.
+type held = {sections: Lapa.loadable<array<Course.Section.t>>}
+
+@val external later: (unit => unit, int) => unit = "setTimeout"
+
 // One browser database a session, as the board keeps it.
 let open_ = async (token: string) => {
   let indexed = await outcome(reply => IndexedDbKv.make(~name=`lapa:${token}`, reply))
   let client = await Client.make({base: "/_lapa", token, kv: indexed.kv})
   Browse.make(client)->Promise.thenResolve(browse => page.browse = Some(browse))->Promise.ignore
   let standing = await standing(client)
-  switch await section(client, standing) {
-  | Some(first) => page.screen = Editing(editing(client, standing, first))
-  | None =>
-    let waiting = Tilia.tilia({client, standing, offers: []})
-    page.screen = Waiting(waiting)
-    let looks = () =>
-      offers(client, standing)->Promise.thenResolve(found => waiting.offers = found)->Promise.ignore
-    looks()
-    // The offer arrives as a delivery, and so does the section once the
-    // offer is accepted: the first Section held ends the wait.
-    let hearing: ref<option<Client.receiving>> = ref(None)
-    hearing :=
-      Some(
-        client.receives(_ => {
-          looks()
-          section(client, standing)
-          ->Promise.thenResolve(held =>
-            switch held {
-            | Some(first) =>
-              hearing.contents->Option.forEach(receiving => receiving.cancel())
-              page.screen = Editing(editing(client, standing, first))
-            | None => ()
-            }
-          )
-          ->Promise.ignore
-        }),
-      )
-  }
+  let binding = LapaTilia.make(~client, ~clock=SystemClock.make())
+  let held = Tilia.carve(({derived}) => {
+    sections: derived(_ => binding.load(Lapa.under(Course.Section.klass)(standing.personal))),
+  })
+  let waiting = Tilia.tilia({client, standing, offers: []})
+  let looks = () =>
+    offers(client, standing)->Promise.thenResolve(found => waiting.offers = found)->Promise.ignore
+  let _ = client.receives(_ => looks())
+  // The screen follows the list: the first section held opens the editor
+  // on it; none opens the wait, and the founder makes one. The move runs
+  // off the tracked read, so what the editor reads is not observed here.
+  let making = ref(false)
+  let _ = Tilia.observe(() =>
+    switch (held.sections, page.screen) {
+    | (Loaded(_), Editing(_)) => ()
+    | (Loaded({data}), _) =>
+      switch data->Array.get(0) {
+      | Some(first) => later(() => page.screen = Editing(editing(client, standing, first)), 0)
+      | None =>
+        if standing.founder && !making.contents {
+          making := true
+          later(() => opened(client, standing)->Promise.ignore, 0)
+        } else {
+          later(() => page.screen = Waiting(waiting), 0)
+        }
+      }
+    | (NoData({reason: Failed({message})}), _) => later(() => page.screen = Failed(message), 0)
+    | _ => ()
+    }
+  )
+  looks()
 }
 
 let accept = (client: Client.t, standing: standing, offer: offer) =>
