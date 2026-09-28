@@ -56,7 +56,7 @@ var:
       </main>
     </body>
     </html>
-  port: 62924
+  port: 55283
 build:
   - output: "{{output}}/index.html"
     input: "{{shell}}"

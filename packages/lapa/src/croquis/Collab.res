@@ -355,7 +355,7 @@ let editing = (client: Client.t, standing: standing, first: Course.Section.t) =>
     state: TiliaEditor.View.prepare(port(first)),
     others: [],
     section: first,
-    storage: {sections: [], update: _ => ()},
+    storage: {sections: [], update: _ => (), merge: (~base as _, ~local as _, ~remote) => remote},
     synced: false,
     saved: 0,
     received: 0,
@@ -394,6 +394,7 @@ let editing = (client: Client.t, standing: standing, first: Course.Section.t) =>
           }
         }
       ),
+    merge: (~base as _, ~local as _, ~remote) => remote,
   }
   self.storage = storage
   onWindow("blur", flush)

@@ -57,6 +57,7 @@ given1("an editor over a section", (_on, example: edit) => {
   let storage: Section.storage = {
     sections: [Storage.write(doc, ~id="s")],
     update: sections => received := sections,
+    merge: (~base as _, ~local as _, ~remote) => remote,
   }
   let result = Steps.acts(example.when_)->Array.reduce(doc, Steps.act)
   Storage.commit(storage, ~id="s", result)

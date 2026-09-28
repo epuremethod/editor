@@ -99,6 +99,88 @@ let types: dict<View.spec> = Dict.fromArray([
 
 let shown = Tilia.tilia({last: ""})
 
+// One side's change to a text: the span of the base it replaces, and what
+// it puts there.
+type change = {start: int, stop: int, text: string}
+
+let change = (base: string, side: string) => {
+  let size = Math.Int.min(base->String.length, side->String.length)
+  let prefix = Edit.commonPrefix(base, side, ~max=size)
+  let suffix = Edit.commonSuffix(base, side, ~max=size - prefix)
+  {
+    start: prefix,
+    stop: base->String.length - suffix,
+    text: side->String.slice(~start=prefix, ~end=side->String.length - suffix),
+  }
+}
+
+// A text both sides changed: two changes that do not overlap both land, and
+// the reader's text stands otherwise. Two insertions at one place land the
+// reader's first. A stand-in for lapa's merge, word by word, until the demo
+// can take it.
+let text = (~base: string, ~local: string, ~remote: string) =>
+  if local == base {
+    remote
+  } else if remote == base || remote == local {
+    local
+  } else {
+    let mine = change(base, local)
+    let theirs = change(base, remote)
+    if mine.start < theirs.stop && theirs.start < mine.stop {
+      local
+    } else {
+      let (first, second) =
+        (theirs.start, theirs.stop) < (mine.start, mine.stop) ? (theirs, mine) : (mine, theirs)
+      base->String.slice(~start=0, ~end=first.start) ++
+      first.text ++
+      base->String.slice(~start=first.stop, ~end=second.start) ++
+      second.text ++
+      base->String.slice(~start=second.stop)
+    }
+  }
+
+// The host's merge: a block or atom both sides changed merges its text, a
+// block or atom the reader typed is kept, one the reader removed and the
+// remote left alone stays removed, the remote one is taken otherwise, and
+// the remote order stands. A typed block the remote dropped
+// keeps its place after the block it followed on screen.
+let merge = (~base: Section.t, ~local: Section.t, ~remote: Section.t): Section.t => {
+  let entry = (held: array<(Doc.id, string)>, id) => held->Array.find(((other, _)) => other == id)
+  let three = (base, local, remote) => {
+    let typed = local->Array.filter(((id, text)) => entry(base, id) != Some((id, text)))
+    let out = remote->Array.filterMap(((id, theirs)) =>
+      switch (entry(typed, id), entry(base, id), entry(local, id)) {
+      | (Some((_, mine)), Some((_, was)), _) =>
+        Some((id, text(~base=was, ~local=mine, ~remote=theirs)))
+      | (Some(mine), None, _) => Some(mine)
+      | (None, Some((_, was)), None) if was == theirs => None
+      | (None, _, _) => Some((id, theirs))
+      }
+    )
+    typed->Array.forEach(((id, text)) =>
+      if entry(remote, id) == None {
+        let rec after = index =>
+          switch local->Array.get(index) {
+          | None => 0
+          | Some((previous, _)) =>
+            switch out->Array.findIndex(((other, _)) => other == previous) {
+            | -1 => after(index - 1)
+            | at => at + 1
+            }
+          }
+        let index = local->Array.findIndex(((other, _)) => other == id)
+        out->Array.splice(~start=after(index - 1), ~remove=0, ~insert=[(id, text)])
+      }
+    )
+    out
+  }
+  {
+    id: remote.id,
+    blocks: three(base.blocks, local.blocks, remote.blocks),
+    atoms: three(base.atoms, local.atoms, remote.atoms),
+  }
+}
+
 // The port writes the section whole, one `@id text` line per block.
 let storage: Section.storage = {
   sections: [section],
@@ -110,6 +192,7 @@ let storage: Section.storage = {
       )
       ->Array.join("\n\n")
   },
+  merge,
 }
 
 // What the port received last, as text. The host wraps it.

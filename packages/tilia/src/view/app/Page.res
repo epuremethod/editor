@@ -7,6 +7,7 @@ open Course
 let state = View.prepare(section)
 let mint = mint(state)
 let mintAtom = mintAtom(state)
+let collaborator = Collaborator.make(section)
 
 // The hook a browser test drives: load a document in the notation with its
 // atoms, read it back in the notation, and read its atoms.
@@ -40,6 +41,7 @@ module App = {
     <main>
       <h1> {React.string("open sets")} </h1>
       <View state section storage mint mintAtom types />
+      <Collaborator.Toggle sim=collaborator state storage />
       <p className="label"> {React.string("what the port received")} </p>
       <pre className="port" id="port">
         <Received />
@@ -68,6 +70,8 @@ let style = `
   .widget { z-index: 10; background: #fff; border: 2px solid var(--red); box-shadow: 0 4px 16px rgba(0,0,0,0.12); padding: 0.4rem; }
   .widget__source { display: block; width: 24rem; font-family: "IBM Plex Mono", monospace; font-size: 0.85rem; border: none; outline: none; }
   .video { font-family: "IBM Plex Mono", monospace; font-size: 0.85em; background: var(--faint); padding: 0.05em 0.3em; }
+  .collaborator { margin: 2rem 0 0; font-size: 0.85rem; color: var(--grey); }
+  .collaborator__last { display: block; margin-top: 0.3rem; font-family: "IBM Plex Mono", monospace; font-size: 0.75rem; }
   .label { margin: 3rem 0 0.5rem; font-size: 0.72rem; font-weight: 500; letter-spacing: 0.3em; text-transform: uppercase; color: var(--grey); }
   .port { margin: 0; padding: 1rem 1.2rem; background: var(--faint); font-family: "IBM Plex Mono", monospace; font-size: 0.8rem; white-space: pre-wrap; min-height: 3rem; }
 `

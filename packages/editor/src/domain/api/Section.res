@@ -12,8 +12,14 @@ type atom = (Doc.id, string)
 type t = {id: Doc.id, blocks: array<block>, atoms: array<atom>}
 
 // The port, as plain data. `sections` is what the host has given the editor
-// to edit, in the order they read. `update` receives the sections an edit changed, whole,
-// once per act. The core observes nothing and writes nothing back into
-// `sections`: a rendering binding decides when to re-read it, and a host
-// decides what to do with an update.
-type storage = {sections: array<t>, update: array<t> => unit}
+// to edit, in the order they read. `update` receives the sections a save
+// changed, whole. `merge` is the host's three-way merge of a section: the
+// row the editor last took, that row with the typed text over it, and the
+// row that landed. The core observes nothing, merges nothing and writes
+// nothing back into `sections`: a rendering binding decides when to re-read
+// it, and a host decides what to do with an update.
+type storage = {
+  sections: array<t>,
+  update: array<t> => unit,
+  merge: (~base: t, ~local: t, ~remote: t) => t,
+}

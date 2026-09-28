@@ -245,6 +245,20 @@ let same = (a: option<(Doc.point, Doc.point)>, selection: option<Doc.selection>)
   | _ => false
   }
 
+// Puts the DOM selection on the model's. The block's element is found
+// wherever it sits under the root: an item is inside its list.
+let place = (root: Browser.node, {anchor, focus}: Doc.selection, selection) => {
+  let at = (point: Doc.point) =>
+    root
+    ->Browser.query("#block-" ++ point.block)
+    ->Nullable.toOption
+    ->Option.map(block => Browser.pointAt(block, point.offset))
+  switch (at(anchor), at(focus)) {
+  | (Some((a, ao)), Some((f, fo))) => selection->Browser.place(a, ao, f, fo)
+  | _ => ()
+  }
+}
+
 let across = (doc: Doc.t) =>
   switch doc.selection {
   | Some({anchor, focus}) => anchor.block != focus.block
@@ -492,7 +506,18 @@ let make = (
     }
   }
 
-  let focusRoot = () => root.current->Nullable.toOption->Option.forEach(Browser.focus)
+  // The DOM caret goes on the model's before the focus: a root focused with
+  // no caret in it takes one at its start and scrolls there.
+  let focusRoot = () =>
+    root.current
+    ->Nullable.toOption
+    ->Option.forEach(root => {
+      switch (state.doc.selection, Browser.selected()->Nullable.toOption) {
+      | (Some(model), Some(selection)) => place(root, model, selection)
+      | _ => ()
+      }
+      root->Browser.focusStill
+    })
 
   // Leaves the box by an act and gives the editor back its caret.
   let leaveBy = (act: Doc.t => Doc.t) => {
@@ -707,24 +732,13 @@ let make = (
       state.doc.selection,
       Browser.selected()->Nullable.toOption,
     ) {
-    | (Some(root), Some({anchor, focus}), Some(selection))
+    | (Some(root), Some(model), Some(selection))
       if Browser.active
       ->Nullable.toOption
       ->Option.map(active => active === root)
       ->Option.getOr(false) =>
-      // The block's element, wherever it sits under the root: an item is
-      // inside its list.
-      let at = (point: Doc.point) =>
-        root
-        ->Browser.query("#block-" ++ point.block)
-        ->Nullable.toOption
-        ->Option.map(block => Browser.pointAt(block, point.offset))
-      switch (at(anchor), at(focus)) {
-      | (Some((a, ao)), Some((f, fo))) =>
-        if !same(selected(root), Some({anchor, focus, pending: []})) {
-          selection->Browser.place(a, ao, f, fo)
-        }
-      | _ => ()
+      if !same(selected(root), Some(model)) {
+        place(root, model, selection)
       }
     | _ => ()
     }

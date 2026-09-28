@@ -14,8 +14,8 @@ importers:
         specifier: workspace:^
         version: link:../packages/editor
       '@epure/minidoc':
-        specifier: 0.1.0
-        version: 0.1.0(rescript@12.3.1)
+        specifier: 0.1.1
+        version: 0.1.1(rescript@12.3.1)
       katex:
         specifier: 0.18.9
         version: 0.18.9
@@ -147,8 +147,8 @@ packages:
   '@cucumber/messages@27.2.0':
     resolution: {integrity: sha512-f2o/HqKHgsqzFLdq6fAhfG1FNOQPdBdyMGpKwhb7hZqg0yZtx9BVqkTyuoNk83Fcvk3wjMVfouFXXHNEk4nddA==}
 
-  '@epure/minidoc@0.1.0':
-    resolution: {integrity: sha512-l8LDwBIWRrZFqPu8CDMkaAFLXbDw1ia8JjiGSjowLT8Zu3abABZnjxc/wKdwxw16Nbjhw8bZK9Lseqs4urfXtg==}
+  '@epure/minidoc@0.1.1':
+    resolution: {integrity: sha512-+HdSw1RLiiQYqALkz0fMf9ABtc0hGVkmjps4dsO541KzJZFyp3yZx0byFFd2haM0wd2Cs6QDh9kMwNxw4kSOTw==}
     engines: {node: '>=22'}
 
   '@epure/vitest@2.0.0':
@@ -903,7 +903,7 @@ snapshots:
       reflect-metadata: 0.2.2
       uuid: 11.0.5
 
-  '@epure/minidoc@0.1.0(rescript@12.3.1)':
+  '@epure/minidoc@0.1.1(rescript@12.3.1)':
     dependencies:
       '@rescript/runtime': 12.3.0
       marked: 18.0.14

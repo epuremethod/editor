@@ -36,6 +36,9 @@ let textContent = (node: node) => node->rawText->String.replaceAll("\u00a0", " "
 @send external on: (node, string, event => unit) => unit = "addEventListener"
 @send external off: (node, string, event => unit) => unit = "removeEventListener"
 @send external focus: node => unit = "focus"
+type focusOptions = {preventScroll: bool}
+@send external focusWith: (node, focusOptions) => unit = "focus"
+let focusStill = (node: node) => node->focusWith({preventScroll: true})
 
 @get external inputType: event => string = "inputType"
 @get external data: event => Nullable.t<string> = "data"
