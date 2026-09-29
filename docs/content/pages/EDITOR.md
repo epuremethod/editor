@@ -432,21 +432,31 @@ The evaluator trigger on a relation change, sibling of the trigger on an
 
 `@epure/editor` exists and is the model described here: the types, runs,
 the inline markdown reader and writer, the notation, every edit on the
-Operations page, and the port with its two crossings. A hundred scenarios
-pass with no browser. Blocks have three forms, prose, heading and item; a
-formula or an embed still reads as literal text on the port.
+Operations page, and the port with its two crossings. Blocks have four
+forms, prose, heading, item and display, and a section holds its atoms
+beside its blocks, each named by a reference. The core holds the current
+row and the displayed document, and reads the typed text as what the
+document holds that the row does not. An act that keeps the block list
+leaves the save to the host; any other act saves at once. A row that lands
+goes through the port's `merge` with the row and the displayed section, and
+the answer is displayed. A hundred and seventy-five scenarios pass with no
+browser.
 
 `@tilia/editor` exists as an experiment in this workspace, to move to tilia's
 own once its shape has settled. It renders one section, headings and lists
 included, splits input by type between the browser and the model, rebuilds
 the block the browser touched, keeps the model's selection level with the
-DOM's, and hands the changed section to the port after every act. The Demo
-page of this site is that editor over the page itself, with what the port
-received under it. Eighty-two of the cards run in Chrome through the same
-fixtures; six are skipped because no key drives them. Composition is wired
+DOM's, draws each atom through a type the host injects, and hands the
+changed section to the port after every act; it does not call the core's
+save or landing yet. The Demo page of this site is that editor over the
+page itself, with what the port received under it and a simulated
+collaborator whose rows land through the core. A hundred and eighteen of
+the cards run in Chrome through the same fixtures; eight are skipped
+because no key drives them. Composition is wired
 and untested, and Safari and Firefox are untouched.
 
-`@lapa/editor` does not exist. Nothing on the rows and reach pages is built.
+`@lapa/editor` holds only a croquis: two browsers share a section through
+`@lapa/tilia`. Nothing on the rows and reach pages is built.
 `@lapa/db` merges a record field by field; diff3 on a text field and the
 keyed array's sequence merge are still to write there.
 
@@ -459,7 +469,8 @@ keyed array's sequence merge are still to write there.
 | Copy and paste | paste from plain text; copy and HTML to come |
 | Undo | not started |
 | Block forms: headings and items | done |
-| Formulas and embeds | not started |
+| Formulas and embeds | formulas done; embeds drawn by type, rows not bound |
+| Typed text and a landed row | done in the core; the view to move onto it |
 | Lapa: text diff3, the sequence merge, rows through the port | not started |
 
 ## Order of work

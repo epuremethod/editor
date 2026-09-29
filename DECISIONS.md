@@ -131,3 +131,47 @@ sentence about the binding had to say which one it meant.
 
 Costs the design page one noun less between a source and its rendering,
 which the words "text" and "draws" now carry.
+
+## 2026-09-27 — An arrival merges through the port, at arrival
+
+A row that lands meets text the store has never seen: the keys typed since
+the last save. The core hands the host's `merge` three sections, the row it
+last took, that row with the typed text over it, and the row that landed,
+and displays the answer. Lapa's own merge runs at the pull, over two saved
+rows, and the two never meet the same edit: offline nothing lands, online
+the outbox is empty.
+
+Refused: a merge coded in the core. It would carry diff3 and run against
+another base than lapa's. Refused: a merge at save time with the base on
+the port. It hides the other author's words for the whole pause and changes
+`update`'s shape.
+
+Costs every host one `merge`, even a host that never lands a row, which
+answers the remote.
+
+## 2026-09-27 — Typed text is a read, not a value
+
+The editor holds the current row and the displayed document. The typed
+text is what the document holds that the row does not, in the document's
+order. A save writes the document and makes it the row; a landed row
+becomes the row and the merge's answer becomes the document.
+
+Refused: a dictionary of typed text keyed by id, with a list of ids for the
+order. The document already holds both, and the dictionary was a second
+copy to keep level.
+
+Costs a write of the document and a comparison against the row on every
+read of the typed text.
+
+## 2026-09-27 — Save timing follows the resulting block list
+
+An act whose result keeps the same ids in the same order is typing, and
+the host decides when to save it. Any other result saves at once: a join,
+a split, a move, a removal, a paste of several lines. The word is `typed`;
+a draft is lapa's, a stored row with the Draft facet.
+
+Refused: a save on every act. A keystroke is not a save, and `@tilia/query`
+and lapa both model an explicit write. Refused: naming the acts that save.
+A paste saves or not by its shape.
+
+Costs the host one call, `save`, and the tilia binding a way to expose it.
