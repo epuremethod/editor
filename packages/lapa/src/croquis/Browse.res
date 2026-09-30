@@ -38,23 +38,29 @@ let field = (entity: Lapa.Entity.t, ~facet, ~field) =>
 
 let classOf = entity =>
   switch field(entity, ~facet=Lapa.Root.entity, ~field=Lapa.Root.Entity.klass) {
-  | Some(Lapa.Value.Relation(id)) => Some(id)
+  | Some(String(id)) => Some(id)
   | _ => None
   }
 
 let titleOf = entity =>
   switch field(entity, ~facet=Lapa.Root.titled, ~field=Lapa.Root.Titled.title) {
-  | Some(Lapa.Value.Text(title)) => Some(title)
+  | Some(String(title)) => Some(title)
   | _ => None
   }
 
 let iconOf = entity =>
   switch field(entity, ~facet=Lapa.Root.iconed, ~field=Lapa.Root.Iconed.icon) {
-  | Some(Lapa.Value.Entries(entries)) => Lapa.Icon.layers(entries)
-  | _ => []
+  | Some(json) =>
+    Lapa.Entry.list(json)
+    ->Option.getOr([])
+    ->Array.filterMap(({id, value}) =>
+      value->JSON.Decode.string->Option.map((value): Lapa.entry<string> => {id, value})
+    )
+    ->Lapa.Icon.layers
+  | None => []
   }
 
-let section = Lapa.klassId(Course.Section.klass)
+let section = Lapa.Root.section
 
 // The roots the croquis meets, by name, for a class row the client does
 // not hold.

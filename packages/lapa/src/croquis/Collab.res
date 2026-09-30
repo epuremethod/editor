@@ -55,7 +55,7 @@ let streamed = (run: Reply.stream<'a> => unit): promise<array<'a>> =>
 // The ids the client holds of one class.
 let ofClass = (client: Client.t, klass: Lapa.id) =>
   streamed(stream =>
-    client.store.seek({field: Lapa.Root.Entity.klass, test: Is(Relation(klass))}, stream)
+    client.store.seek({field: Lapa.Root.Entity.klass, test: Is(JSON.String(klass))}, stream)
   )
 
 // Where the person stands: the Domain their Account reads, at `admin` for
@@ -90,35 +90,37 @@ let field = (entity: Lapa.Entity.t, ~facet, ~field) =>
 
 let titleOf = (entity: Lapa.Entity.t) =>
   switch field(entity, ~facet=Lapa.Root.titled, ~field=Lapa.Root.Titled.title) {
-  | Some(Text(title)) => Some(title)
+  | Some(String(title)) => Some(title)
   | _ => None
   }
 
-
-
-let opening: array<Lapa.entry> = [
-  {id: "a", text: "# Open sets"},
+let opening: array<Lapa.entry<string>> = [
+  {id: "a", value: "# Open sets"},
   {
     id: "b",
-    text: "A **topology** on a set X is a collection τ of subsets of X, called _open sets_, such that:",
+    value: "A **topology** on a set X is a collection τ of subsets of X, called _open sets_, such that:",
   },
-  {id: "c", text: "The empty set and X itself are open."},
+  {id: "c", value: "The empty set and X itself are open."},
   {
     id: "d",
-    text: "Any union of open sets is open, and any finite intersection of open sets is open.",
+    value: "Any union of open sets is open, and any finite intersection of open sets is open.",
   },
-  {id: "e", text: "The pair {{f1}} is the first axiom, and alone it is a display:"},
-  {id: "f", text: ":: {{f1}}"},
+  {id: "e", value: "The pair {{f1}} is the first axiom, and alone it is a display:"},
+  {id: "f", value: ":: {{f1}}"},
 ]
 
-let openingAtoms: array<Lapa.entry> = [
-  {id: "f1", text: "math\n\\emptyset \\in \\tau \\quad\\text{and}\\quad X \\in \\tau"},
+let openingAtoms: array<Lapa.placed<string>> = [
+  {
+    id: "f1",
+    value: "math\n\\emptyset \\in \\tau \\quad\\text{and}\\quad X \\in \\tau",
+    param: Dict.make(),
+  },
 ]
 
 let save = (client: Client.t, section: Course.Section.t) =>
   outcome(reply => client.ops.upsert(~actor=client.actor, [Course.Section.record(section)], reply))
 
-// The founder's first section, under their Personal node.
+// The founder's first section, under their Personal node and first in it.
 let opened = (client: Client.t, standing: standing) =>
   save(
     client,
@@ -126,25 +128,35 @@ let opened = (client: Client.t, standing: standing) =>
       client.context,
       ~under=standing.personal,
       ~section={blocks: opening, atoms: openingAtoms},
+      ~ordered={parents: [{id: standing.personal, value: "a", param: Dict.make()}]},
       ~titled={title: "Open sets"},
     ),
   )
 
 // ── the port ────────────────────────────────────────────────────────────
 
-let pairs = (entries: array<Lapa.entry>) => entries->Array.map(entry => (entry.id, entry.text))
-let entries = (pairs: array<(Doc.id, string)>): array<Lapa.entry> =>
-  pairs->Array.map(((id, text)) => {Lapa.id, text})
-
+// The port holds no param yet, so an atom written back keeps the param it
+// was read with.
 let port = (section: Course.Section.t): Section.t => {
   id: section.entity.id,
-  blocks: section.section->Option.mapOr([], part => pairs(part.blocks)),
-  atoms: section.section->Option.mapOr([], part => pairs(part.atoms)),
+  blocks: section.section.blocks->Array.map(entry => (entry.id, entry.value)),
+  atoms: section.section.atoms->Array.map(atom => (atom.id, atom.value)),
 }
 
 let written = (section: Course.Section.t, port: Section.t): Course.Section.t => {
-  ...section,
-  section: {blocks: entries(port.blocks), atoms: entries(port.atoms)},
+  let params =
+    section.section.atoms->Array.map(atom => (atom.id, atom.param))->Dict.fromArray
+  {
+    ...section,
+    section: {
+      blocks: port.blocks->Array.map(((id, value)): Lapa.entry<string> => {id, value}),
+      atoms: port.atoms->Array.map(((id, value)): Lapa.placed<string> => {
+        id,
+        value,
+        param: params->Dict.get(id)->Option.getOr(Dict.make()),
+      }),
+    },
+  }
 }
 
 // ── the types ───────────────────────────────────────────────────────────
@@ -310,7 +322,7 @@ let others = async (client: Client.t, standing: standing, ~section: Lapa.id) => 
     switch await found(reply => client.store.get(inbox, reply)) {
     | Some(row) =>
       switch field(row, ~facet=Lapa.Root.owned, ~field=Lapa.Root.Owned.owner) {
-      | Some(Relation(author)) =>
+      | Some(String(author)) =>
         (await found(reply => client.store.get(author, reply)))->Option.flatMap(titleOf)
       | _ => None
       }
@@ -608,7 +620,7 @@ module Editor = {
   @react.component
   let make = (~opened: opened) =>
     <main>
-      <h1> {React.string(opened.section.titled.title)} </h1>
+      <h1> {React.string(opened.section.titled->Option.mapOr("", titled => titled.title))} </h1>
       <TiliaEditor.View
         state=opened.state section={port(opened.section)} storage=opened.storage types
       />

@@ -677,6 +677,7 @@ body {
   margin: 0;
   min-width: 0;
   display: grid;
+  align-content: start;
   gap: 0.2rem;
   padding: 0 1.4rem 0 0;
   position: relative;
@@ -694,7 +695,7 @@ body {
   color: var(--red);
 }
 
-.flow__name { font-size: 1.05em; font-weight: 500; }
+.flow__name { font-size: 1.05em; font-weight: 500; line-height: 1.35; min-height: 2.7em; }
 
 .flow__note { font-size: 0.9em; color: var(--grey); line-height: 1.35; }
 

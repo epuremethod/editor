@@ -11,6 +11,8 @@ var:
   indexToc: ""
   operationsToc: ""
   demoToc: ""
+  imageCurrent: ""
+  imageToc: ""
   contents: |-
     <aside class="contents" aria-label="Contents">
       <a class="brand" href="./index.html">editor <span class="brand__edition">/ 1926</span></a>
@@ -19,6 +21,7 @@ var:
         <li><a href="./index.html"{{indexCurrent}}>The editor</a>{{indexToc}}</li>
         <li><a href="./demo.html"{{demoCurrent}}>Demo</a>{{demoToc}}</li>
         <li><a href="./operations.html"{{operationsCurrent}}>Operations</a>{{operationsToc}}</li>
+        <li><a href="./image.html"{{imageCurrent}}>Images</a>{{imageToc}}</li>
       </ol>
       <footer class="contents__colophon">
         <a href="https://github.com/epuremethod/editor">github.com/epuremethod/editor</a>
@@ -94,6 +97,14 @@ build:
       pageBody: { file: pages/OPERATIONS.md, transform: docsMd }
       operationsToc: { file: pages/OPERATIONS.md, transform: docsToc }
       operationsCurrent: ' aria-current="page"'
+  - output: "{{output}}/image.html"
+    input: "{{shell}}"
+    var:
+      title: Images — Editor
+      running: Images
+      pageBody: { file: pages/IMAGE.md, transform: docsMd }
+      imageToc: { file: pages/IMAGE.md, transform: docsToc }
+      imageCurrent: ' aria-current="page"'
   - output: "{{output}}/style.css"
     input: { copy: ../assets/style.css }
   - output: "{{output}}/demo.js"

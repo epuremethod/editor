@@ -59,8 +59,8 @@ importers:
         specifier: workspace:^
         version: link:../tilia
       '@tilia/query':
-        specifier: link:../../../sylva/node_modules/.pnpm/@tilia+query@0.1.0-beta.20260903T083650_4cae32893654861c686da18f0cfc32c9/node_modules/@tilia/query
-        version: link:../../../sylva/node_modules/.pnpm/@tilia+query@0.1.0-beta.20260903T083650_4cae32893654861c686da18f0cfc32c9/node_modules/@tilia/query
+        specifier: 0.1.0
+        version: 0.1.0
       katex:
         specifier: ^0.18.9
         version: 0.18.9
@@ -78,8 +78,8 @@ importers:
         specifier: ^12.3.0
         version: 12.3.1
       '@tilia/react':
-        specifier: 6.0.0-beta.20260820T171602
-        version: 6.0.0-beta.20260820T171602(react@19.3.0)
+        specifier: 6.0.0
+        version: 6.0.0(react@19.3.0)
       react:
         specifier: ^19.2.0
         version: 19.3.0
@@ -90,8 +90,8 @@ importers:
         specifier: ^12.3.0
         version: 12.3.1
       tilia:
-        specifier: link:../../../sylva/node_modules/.pnpm/tilia@6.0.0-beta.20260903T083626_964b66c08dff8fb2fda02cf4094571fa/node_modules/tilia
-        version: link:../../../sylva/node_modules/.pnpm/tilia@6.0.0-beta.20260903T083626_964b66c08dff8fb2fda02cf4094571fa/node_modules/tilia
+        specifier: 6.0.0
+        version: 6.0.0
       vite:
         specifier: ^7.1.0
         version: 7.3.6(yaml@2.9.0)
@@ -118,8 +118,8 @@ importers:
         specifier: ^12.3.0
         version: 12.3.1
       '@tilia/react':
-        specifier: 6.0.0-beta.20260820T171602
-        version: 6.0.0-beta.20260820T171602(react@19.3.0)
+        specifier: 6.0.0
+        version: 6.0.0(react@19.3.0)
       react:
         specifier: ^19.2.0
         version: 19.3.0
@@ -130,8 +130,8 @@ importers:
         specifier: ^12.3.0
         version: 12.3.1
       tilia:
-        specifier: 6.0.0-beta.20260820T171602
-        version: 6.0.0-beta.20260820T171602
+        specifier: 6.0.0
+        version: 6.0.0
       vite:
         specifier: ^7.1.0
         version: 7.3.6(yaml@2.9.0)
@@ -518,8 +518,11 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@tilia/react@6.0.0-beta.20260820T171602':
-    resolution: {integrity: sha512-K5t6yzjiMKGtBDSC5L9+LzJUNhWYWPYwAsa+JphsAsGBZyIgps9p9M9k3zSZzrXAAQFH4jTWoR8I2/BkUvMPFA==}
+  '@tilia/query@0.1.0':
+    resolution: {integrity: sha512-yM5WzSTj7o23Q86ACNGp1w5RLPVxF4Hb5ImSMeXYuA4dQWd5hV0qbFIkSC7wej0Hj5Oqa9iv6DVlasoN3zcEuw==}
+
+  '@tilia/react@6.0.0':
+    resolution: {integrity: sha512-ujqHf6t1ph6ndQ6UCACpwY7usq1VzQEUJwNYsazNFHXzjJ+vzIfC3BwXDssOTVx/b7Fd0J7FDXPnYcMun2dMfA==}
     peerDependencies:
       react: '*'
 
@@ -775,8 +778,8 @@ packages:
   tilia@5.2.0:
     resolution: {integrity: sha512-GWJg/4Foy9ELut+CnoOMiA38fHdVnZBwtqyLbQiGXf9vWZcF/pKxRfwn0hbYVBN7pcwAHuzTojbjLzur8XmD6A==}
 
-  tilia@6.0.0-beta.20260820T171602:
-    resolution: {integrity: sha512-wahY71BUhLZzCzZ0si9gyNIY1ZMyAzcWat2IW0nsQIkK/YnzNtZ5uZ3z4KMBhx6l+uurmwykXLg9FIcfGgZyWw==}
+  tilia@6.0.0:
+    resolution: {integrity: sha512-DI48u+jtXFN7rh3onu7nxGi94i0UmoNfv8MeI6QZBmpIIODprRcrF/dicUO+ubOo1JZ52AhgNLMSyowkXTIsUw==}
 
   tinybench@2.9.0:
     resolution: {integrity: sha512-0+DUvqWMValLmha6lr4kD8iAMK1HzV0/aKnCtWb9v9641TnP/MFb7Pc2bxoxQjTXAErryXVgUOfv2YqNllqGeg==}
@@ -1119,10 +1122,14 @@ snapshots:
   '@rollup/rollup-win32-x64-msvc@4.63.5':
     optional: true
 
-  '@tilia/react@6.0.0-beta.20260820T171602(react@19.3.0)':
+  '@tilia/query@0.1.0':
+    dependencies:
+      tilia: 6.0.0
+
+  '@tilia/react@6.0.0(react@19.3.0)':
     dependencies:
       react: 19.3.0
-      tilia: 6.0.0-beta.20260820T171602
+      tilia: 6.0.0
 
   '@types/chai@5.2.3':
     dependencies:
@@ -1391,7 +1398,7 @@ snapshots:
 
   tilia@5.2.0: {}
 
-  tilia@6.0.0-beta.20260820T171602: {}
+  tilia@6.0.0: {}
 
   tinybench@2.9.0: {}
 
