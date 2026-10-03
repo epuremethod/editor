@@ -1,7 +1,7 @@
 {
-  "name": "@lapa/editor",
+  "name": "@radif/editor",
   "version": "0.0.0",
-  "description": "The lapa binding of @epure/editor: the port filled with rows, a section as one record whose blocks and atoms are two lists.",
+  "description": "The radif binding of @epure/editor: the port filled with rows, a section as one record whose blocks and atoms are two lists.",
   "type": "module",
   "engines": {
     "node": ">=22"
@@ -14,15 +14,15 @@
   },
   "dependencies": {
     "@epure/editor": "workspace:^",
-    "@lapa/db": "link:../../../sylva/packages/db",
-    "@lapa/tilia": "link:../../../sylva/packages/tilia",
+    "@radif/db": "link:../../../radif/packages/db",
+    "@radif/tilia": "link:../../../radif/packages/tilia",
+    "@radif/types": "link:../../../radif/packages/types",
     "@tilia/editor": "workspace:^",
     "@tilia/query": "0.1.0",
-    "katex": "^0.18.9",
-    "lapa": "link:../../../sylva/packages/lapa"
+    "katex": "^0.18.9"
   },
   "devDependencies": {
-    "@lapa/server": "link:../../../sylva/packages/server",
+    "@radif/server": "link:../../../radif/packages/server",
     "@rescript/react": "^0.15.0",
     "@rescript/runtime": "^12.3.0",
     "@tilia/react": "6.0.0",

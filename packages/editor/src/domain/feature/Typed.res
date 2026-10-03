@@ -26,17 +26,19 @@ let act = (state: t, storage: Section.storage, edit: Doc.t => Doc.t): t => {
   ids(doc) == ids(state.doc) ? next : save(next, storage)
 }
 
-let differs = (held: array<(Doc.id, string)>, (id, text)) =>
-  held->Array.find(((other, _)) => other == id) != Some((id, text))
+let differs = (held, entry, ~key) =>
+  held->Array.find(other => key(other) == key(entry)) != Some(entry)
 
-// The blocks and atoms whose text differs from the row, in the document's
-// order.
+// The blocks and atoms that differ from the row, in the document's order.
+// An atom differs by its text or by its param.
 let typed = (state: t): Section.t => {
   let section = shown(state)
   {
     id: section.id,
-    blocks: section.blocks->Array.filter(differs(state.row.blocks, ...)),
-    atoms: section.atoms->Array.filter(differs(state.row.atoms, ...)),
+    blocks: section.blocks->Array.filter(differs(state.row.blocks, _, ~key=((id, _)) => id)),
+    atoms: section.atoms->Array.filter(
+      differs(state.row.atoms, _, ~key=(atom: Section.atom) => atom.id),
+    ),
   }
 }
 
@@ -60,7 +62,10 @@ let mapped = (offset, ~old: string, ~new: string) => {
 let carried = (state: t, doc: Doc.t, point: Doc.point): option<Doc.point> =>
   switch (Doc.block(state.doc, point.block), Doc.block(doc, point.block)) {
   | (Some(was), Some(is)) =>
-    Some({block: point.block, offset: mapped(point.offset, ~old=was.content.text, ~new=is.content.text)})
+    Some({
+      block: point.block,
+      offset: mapped(point.offset, ~old=was.content.text, ~new=is.content.text),
+    })
   | _ => None
   }
 

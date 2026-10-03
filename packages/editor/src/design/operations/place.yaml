@@ -1,0 +1,38 @@
+feature: Place
+background:
+  given: an editor
+examples:
+  - scenario: place gives an atom a param
+    atoms:
+      f2: {type: image, text: r42}
+    before: |
+      An open cover of the unit interval:
+      :: {{f2}}|
+    when: place(f2, width=50%)
+    after: |
+      An open cover of the unit interval:
+      :: {{f2}}|
+    atomsAfter:
+      f2: {type: image, text: r42, param: {width: 50%}}
+
+  - scenario: place replaces the whole param
+    atoms:
+      f2: {type: image, text: r42, param: {width: 50%, rotate: '90'}}
+    before: |
+      :: {{f2}}|
+    when: place(f2, width=100%)
+    after: |
+      :: {{f2}}|
+    atomsAfter:
+      f2: {type: image, text: r42, param: {width: 100%}}
+
+  - scenario: place on an atom the section does not contain changes nothing
+    atoms:
+      f2: {type: image, text: r42}
+    before: |
+      :: {{f2}}|
+    when: place(zz99, width=50%)
+    after: |
+      :: {{f2}}|
+    atomsAfter:
+      f2: {type: image, text: r42}

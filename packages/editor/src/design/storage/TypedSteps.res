@@ -6,7 +6,7 @@ open EpureVitest
 // so one harness drives both fixtures.
 
 type blockRow = {block: string, text: string}
-type atomRow = {atom: string, @as("type") type_: string, source: string}
+type atomRow = {atom: string, @as("type") type_: string, source: string, param?: string}
 
 let caret = "║"
 
@@ -14,7 +14,11 @@ let blocksOf = (table): array<Section.block> =>
   toRecords(table)->Array.map((row: blockRow) => (row.block, row.text))
 
 let atomsOf = (table): array<Section.atom> =>
-  toRecords(table)->Array.map((row: atomRow) => (row.atom, row.type_ ++ "\n" ++ row.source))
+  toRecords(table)->Array.map((row: atomRow): Section.atom => {
+    id: row.atom,
+    text: row.type_ ++ "\n" ++ row.source,
+    param: Steps.paramOf(row.param->Option.getOr("")),
+  })
 
 let isAtoms = (table: array<array<string>>) =>
   table->Array.get(0)->Option.flatMap(header => header->Array.get(0)) == Some("atom")
@@ -22,19 +26,19 @@ let isAtoms = (table: array<array<string>>) =>
 // The fixture's merge: a local block or atom where it differs from the
 // base, the remote one otherwise, and what only the remote holds after.
 let plain = (~base: Section.t, ~local: Section.t, ~remote: Section.t): Section.t => {
-  let same = (held: array<(Doc.id, string)>, id, text) =>
-    held->Array.find(((other, _)) => other == id) == Some((id, text))
-  let merge = (base, local, remote) => {
-    let kept = local->Array.filterMap(((id, text)) =>
-      same(base, id, text) ? remote->Array.find(((other, _)) => other == id) : Some((id, text))
-    )
-    let added = remote->Array.filter(((id, _)) => local->Array.every(((other, _)) => other != id))
+  let merge = (base, local, remote, ~key) => {
+    let find = (entries, id) => entries->Array.find(entry => key(entry) == id)
+    let kept =
+      local->Array.filterMap(entry =>
+        find(base, key(entry)) == Some(entry) ? find(remote, key(entry)) : Some(entry)
+      )
+    let added = remote->Array.filter(entry => find(local, key(entry)) == None)
     Array.concat(kept, added)
   }
   {
     id: remote.id,
-    blocks: merge(base.blocks, local.blocks, remote.blocks),
-    atoms: merge(base.atoms, local.atoms, remote.atoms),
+    blocks: merge(base.blocks, local.blocks, remote.blocks, ~key=((id, _)) => id),
+    atoms: merge(base.atoms, local.atoms, remote.atoms, ~key=(atom: Section.atom) => atom.id),
   }
 }
 
@@ -99,12 +103,15 @@ given1("a section", (on, table: array<array<string>>) => {
     switch (placed.blocks, placed.selection) {
     | ([{content: {text: plain}}], Some({focus: {offset}})) =>
       state :=
-        Typed.act(state.contents, storage, doc =>
-          switch doc.blocks->Array.find(block => block.content.text == plain) {
-          | Some(block) =>
-            Edit.select(doc, ~anchor={block: block.id, offset}, ~focus={block: block.id, offset})
-          | None => panic(`No block reads "${plain}"`)
-          }
+        Typed.act(
+          state.contents,
+          storage,
+          doc =>
+            switch doc.blocks->Array.find(block => block.content.text == plain) {
+            | Some(block) =>
+              Edit.select(doc, ~anchor={block: block.id, offset}, ~focus={block: block.id, offset})
+            | None => panic(`No block reads "${plain}"`)
+            },
         )
     | _ => panic("clicks takes the block's plain text with the caret where the click lands")
     }
@@ -112,6 +119,9 @@ given1("a section", (on, table: array<array<string>>) => {
   on.step("the person moves the block up", () => act("moveUp"))
   on.step("the person edits atom {string} to read {string}", (id: string, text: string) =>
     act(`edit(${id}, ${text})`)
+  )
+  on.step("the person places atom {string} at {string}", (id: string, param: string) =>
+    act(`place(${id}, ${param})`)
   )
   on.step("the host saves", () => state := Typed.save(state.contents, storage))
   on.step("a row lands", (table: array<array<string>>) =>

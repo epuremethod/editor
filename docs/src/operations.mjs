@@ -48,9 +48,10 @@ const name = kind => (typeof kind === "string" ? kind : kind.TAG)
 const initial = {Bold: "B", Italic: "I", Code: "`", Link: "K"}
 
 // An atom, drawn the way the editor draws it: a formula through KaTeX,
-// inline or in display mode by its block's form, any other type as its
-// source, and a reference to no atom as itself. The card shows what the
-// person sees, never the source in the line.
+// inline or in display mode by its block's form, an image as a frame around
+// the file it names, any other type as its source, and a reference to no
+// atom as itself. The card shows what the person sees, never the source in
+// the line.
 function atom(id, atoms, display) {
   const atom = atoms[id]
   const inner =
@@ -58,7 +59,9 @@ function atom(id, atoms, display) {
       ? `<span class="tree__missing">${escape(`{{${id}}}`)}</span>`
       : atom.type === "math"
         ? katex.renderToString(atom.text.replace("|", ""), {displayMode: display, throwOnError: false})
-        : `<span class="tree__source">${escape(atom.text.replace("|", ""))}</span>`
+        : atom.type === "image"
+          ? `<span class="tree__source"><span aria-hidden="true">▣ </span>${escape(atom.text.replace("|", ""))}</span>`
+          : `<span class="tree__source">${escape(atom.text.replace("|", ""))}</span>`
   return `<span class="tree__atom${display ? " tree__atom--display" : ""}">${inner}</span>`
 }
 
@@ -124,18 +127,24 @@ function lead(block) {
   return ""
 }
 
-// The atoms under a document: id, type and source. A pipe in a source is
-// the box's caret, drawn as the caret is drawn in a block.
+// The atoms under a document: id, type, source and param. A pipe in a
+// source is the box's caret, drawn as the caret is drawn in a block. A
+// param is written as `place` takes it.
 function sourceHtml(text) {
   const at = text.indexOf("|")
   if (at === -1) return escape(text)
   return `${escape(text.slice(0, at))}<span class="tree__caret"></span>${escape(text.slice(at + 1))}`
 }
 
+function paramHtml(param) {
+  const pairs = Object.entries(param ?? {}).map(([key, value]) => `${key}=${value}`)
+  return pairs.length ? ` <span class="tree__param">${escape(pairs.join(", "))}</span>` : ""
+}
+
 function listed(atoms) {
   const rows = Object.entries(atoms ?? {}).map(
     ([id, atom]) =>
-      `<div class="tree__atom${atom.text.includes("|") ? " tree__atom--open" : ""}"><span class="tree__id">${escape(id)}</span><span class="tree__type">${escape(atom.type)}</span><span class="tree__source">${sourceHtml(atom.text)}</span></div>`,
+      `<div class="tree__atom${atom.text.includes("|") ? " tree__atom--open" : ""}"><span class="tree__id">${escape(id)}</span><span class="tree__type">${escape(atom.type)}</span><span class="tree__source">${sourceHtml(atom.text)}${paramHtml(atom.param)}</span></div>`,
   )
   return rows.length ? `<div class="tree__atoms">${rows.join("")}</div>` : ""
 }
@@ -197,6 +206,8 @@ const keys = {
   insert: "⌘M",
   edit: "⌖",
   escape: "⎋",
+  embed: "⌘V",
+  place: "⤢",
 }
 
 function sign(name) {
@@ -223,6 +234,27 @@ function arguments_(when, atoms) {
   return `<div class="op__arguments">${rows.join("")}</div>`
 }
 
+// `embed(type, text)` makes an atom whose id the fixture names only in the
+// document after it. A reference there to no atom is that atom, in the order
+// the acts run.
+function minted(when, doc, atoms) {
+  const made = parsed(when)
+    .filter(({name, argument}) => name === "embed" && argument !== undefined)
+    .map(({argument}) => {
+      const [type, ...text] = argument.split(",")
+      return {type: type.trim(), text: text.join(",").trim()}
+    })
+  const unknown = doc.blocks
+    .flatMap(block => block.content.marks)
+    .filter(mark => name(mark.kind) === "Ref" && atoms[mark.kind._0] === undefined)
+    .map(mark => mark.kind._0)
+  const found = {...atoms}
+  ;[...new Set(unknown)].forEach((id, index) => {
+    if (made[index]) found[id] = made[index]
+  })
+  return found
+}
+
 function card(example, feature) {
   for (const field of ["scenario", "before", "when", "after"]) {
     if (example[field] === undefined) {
@@ -232,7 +264,7 @@ function card(example, feature) {
   const before = read(example.before).doc
   const after = read(example.after).doc
   const atoms = example.atoms ?? {}
-  const atomsAfter = example.atomsAfter ?? atoms
+  const atomsAfter = minted(example.when, after, example.atomsAfter ?? atoms)
   return [
     `<figure class="op" id="${slugify(example.scenario)}">`,
     `<figcaption class="op__head"><span class="op__title">${escape(example.scenario)}</span><span class="op__feature">${escape(feature)}</span></figcaption>`,

@@ -526,6 +526,8 @@ body {
 
 .tree__source { font-family: var(--mono); font-size: 0.85em; white-space: pre-wrap; }
 
+.tree__param { color: var(--grey); }
+
 .tree__atoms { margin: 0.6rem 0 0; display: grid; gap: 0.3rem; }
 
 .tree__atom {

@@ -1,0 +1,55 @@
+feature: Embed
+background:
+  given: an editor
+examples:
+  - scenario: embed from inside a sentence leaves the sentence whole
+    before: |
+      Every open cover of the unit interval| has a finite subcover.
+    when: embed(image, r42)
+    after: |
+      Every open cover of the unit interval has a finite subcover.
+      :: {{e1}}|
+
+  - scenario: the display block takes a new id and the blocks around it keep theirs
+    before: |
+      @a The intervals (1/n, 1) cover (0, 1):|
+      @b No finite subfamily covers it.
+    when: embed(image, r42)
+    after: |
+      @a The intervals (1/n, 1) cover (0, 1):
+      @c :: {{e1}}|
+      @b No finite subfamily covers it.
+    atomsAfter:
+      e1: {type: image, text: r42}
+
+  - scenario: an empty paragraph becomes the display block and keeps its id
+    before: |
+      @a The intervals (1/n, 1) cover (0, 1):
+      @b |
+      @c No finite subfamily covers it.
+    when: embed(image, r42)
+    after: |
+      @a The intervals (1/n, 1) cover (0, 1):
+      @b :: {{e1}}|
+      @c No finite subfamily covers it.
+
+  - scenario: embed over a selection keeps the selected text and places the atom under its block
+    before: |
+      A {compact} space is one where every open cover has a finite subcover.
+    when: embed(image, r42)
+    after: |
+      A compact space is one where every open cover has a finite subcover.
+      :: {{e1}}|
+
+  - scenario: embed from an open box closes the box
+    atoms:
+      a8f1: {type: math, text: 'U \in \tau|'}
+    before: |
+      A set {{a8f1}}| is open by definition.
+    when: embed(image, r42)
+    after: |
+      A set {{a8f1}} is open by definition.
+      :: {{e1}}|
+    atomsAfter:
+      a8f1: {type: math, text: 'U \in \tau'}
+      e1: {type: image, text: r42}

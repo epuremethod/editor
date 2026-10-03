@@ -13,8 +13,8 @@ markdown in and out, and one small storage port of plain data. It depends on
 nothing, and it is the third instrument of the method beside `@epure/vitest`,
 which runs the scenarios, and `@epure/minidoc`, which publishes them: this
 one writes them. `@tilia/editor` renders: React over contentEditable, input
-events into acts, the block views keyed by id through tilia. `@lapa/editor`
-fills the port with rows and adds what only lapa can give: drafts, proposals,
+events into acts, the block views keyed by id through tilia. `@radif/editor`
+fills the port with rows and adds what only radif can give: drafts, proposals,
 sharing, a section in two documents.
 
 ## Vocabulary
@@ -25,7 +25,7 @@ sections, because a row may hang under a row of the same class.
 
 A **section** is a row, and it is the unit of everything social. It is what a
 person shares, drafts, proposes or transcludes. It is also the smallest thing
-lapa syncs, merges and reaches on its own. A section keeps its blocks in one
+radif syncs, merges and reaches on its own. A section keeps its blocks in one
 field and its atoms in another. The definition of a topology with its three
 axioms is a section. The proof of a theorem is a section. A section has no
 heading level and no nesting. Its heading, when it has one, is a block inside
@@ -152,13 +152,13 @@ Section Compactness
 
 ## Merge
 
-Lapa merges a record three ways against the base it keeps. A plain field
+Radif merges a record three ways against the base it keeps. A plain field
 takes the newer stamp, and two edits to one field conflict whole. This is
 the only way built today. A text field will run diff3, so two edits to
 different places in one paragraph both land, and two edits to the same place
 surface as a conflict with markers a person or an AI can read. The keyed
 array is the third way. The last two are the merge work this editor asks of
-lapa.
+radif.
 
 A keyed array merges entry by entry first, and as texts second. Against the
 base, every entry outside the longest run still in base order has moved, and
@@ -222,7 +222,7 @@ update | the host receives the section, whole
 
 Embeds are opaque to the editor. An embed block is a fenced dictionary with
 a type and parameters, rendered through a component the host injects for
-that type. The editor never asks what the id means. The lapa binding
+that type. The editor never asks what the id means. The radif binding
 supplies the components that resolve it to a row.
 
 ## Files
@@ -230,7 +230,7 @@ supplies the components that resolve it to a row.
 Markdown is the file and interchange format, not the storage format. Pack
 writes a section as plain markdown: a paragraph per block, a heading with its
 hashes, a formula between double dollars, and an embed as a fenced block named
-`lapa` that carries the row's id, its class and its placement. Block ids stay
+`radif` that carries the row's id, its class and its placement. Block ids stay
 out of the file, so the file a human or an AI edits stays clean. Unpack
 matches the edited text back to ids by diff against the previous pack. A fence
 with no id names a row that does not exist yet, so unpack mints the row from
@@ -426,7 +426,7 @@ Bullet points. Where a list is one paragraph block and where each item is its
 own block. The previous answer was to split into blocks past ten items.
 
 The evaluator trigger on a relation change, sibling of the trigger on an
-`under` edge, is a cost to schedule on the lapa side.
+`under` edge, is a cost to schedule on the radif side.
 
 ## Where it stands
 
@@ -455,9 +455,9 @@ the cards run in Chrome through the same fixtures; eight are skipped
 because no key drives them. Composition is wired
 and untested, and Safari and Firefox are untouched.
 
-`@lapa/editor` holds only a croquis: two browsers share a section through
-`@lapa/tilia`. Nothing on the rows and reach pages is built.
-`@lapa/db` merges a record field by field; diff3 on a text field and the
+`@radif/editor` holds only a croquis: two browsers share a section through
+`@radif/tilia`. Nothing on the rows and reach pages is built.
+`@radif/db` merges a record field by field; diff3 on a text field and the
 keyed array's sequence merge are still to write there.
 
 | Stage | State |
@@ -471,7 +471,7 @@ keyed array's sequence merge are still to write there.
 | Block forms: headings and items | done |
 | Formulas and embeds | formulas done; embeds drawn by type, rows not bound |
 | Typed text and a landed row | done in the core; the view to move onto it |
-| Lapa: text diff3, the sequence merge, rows through the port | not started |
+| Radif: text diff3, the sequence merge, rows through the port | not started |
 
 ## Order of work
 
@@ -492,5 +492,5 @@ across blocks | cross-block selection and block-selection mode
 copy and paste | both clipboard formats, the paste batch
 undo | the stack of inverse edits
 block forms | headings and items, then formulas and embeds through an injected component
-lapa | the keyed array, its sequence merge, rows bound through the port
+radif | the keyed array, its sequence merge, rows bound through the port
 ```

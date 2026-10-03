@@ -771,7 +771,7 @@ let rec insert = (doc: Doc.t, ~id: Doc.id, ~type_: string, ~text: string): Doc.t
     )
     let offset = offset + reference->String.length
     let atoms = doc.atoms->Dict.copy
-    atoms->Dict.set(id, {type_, text})
+    atoms->Dict.set(id, {type_, text, param: Dict.make()})
     {
       ...replace(doc, index, content),
       atoms,
@@ -801,4 +801,51 @@ let form = (doc: Doc.t, ~form: Doc.form): Doc.t =>
       }
     )
     {...doc, blocks}
+  }
+
+// Replaces the param of an atom. No block and no text changes.
+let place = (doc: Doc.t, ~id: Doc.id, ~param: dict<string>): Doc.t =>
+  switch doc.atoms->Dict.get(id) {
+  | Some(atom) =>
+    let atoms = doc.atoms->Dict.copy
+    atoms->Dict.set(id, {...atom, param})
+    {...doc, atoms}
+  | None => doc
+  }
+
+// Mints an atom under `atom` and places its reference alone in a display
+// block, under the block where the selection ends. An empty paragraph
+// becomes that display block; any other block stays whole, and a new one
+// takes `block`. Both ids are the caller's. The box closes and the caret
+// lands after the atom.
+let embed = (doc: Doc.t, ~atom: Doc.id, ~block: Doc.id, ~type_: string, ~text: string): Doc.t =>
+  switch doc.selection {
+  | None => doc
+  | Some(selection) =>
+    let (_, stop) = ordered(doc, selection)
+    let index = indexOf(doc, stop.block)
+    let here = blockAt(doc, index)
+    let reference = "{{" ++ atom ++ "}}"
+    let content: Doc.text = {
+      text: reference,
+      marks: [{kind: Ref(atom), start: 0, stop: reference->String.length}],
+    }
+    let empty = here.form == Paragraph && here.content.text == ""
+    let id = empty ? here.id : block
+    let display = {Doc.id, form: Display, content}
+    let blocks = empty
+      ? doc.blocks->Array.map(other => other.id == id ? display : other)
+      : doc.blocks
+        ->Array.slice(~start=0, ~end=index + 1)
+        ->Array.concat([display])
+        ->Array.concat(doc.blocks->Array.slice(~start=index + 1, ~end=doc.blocks->Array.length))
+    let atoms = doc.atoms->Dict.copy
+    atoms->Dict.set(atom, {type_, text, param: Dict.make()})
+    let offset = reference->String.length
+    {
+      blocks,
+      atoms,
+      editing: None,
+      selection: caret(id, offset, Runs.placed(content, offset)),
+    }
   }

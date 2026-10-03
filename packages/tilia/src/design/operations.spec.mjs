@@ -29,11 +29,13 @@ const keys = {
 }
 
 // The atoms of a scenario, with the box's caret: a pipe in an atom's
-// text is the caret, as the model's harness reads it.
+// text is the caret, as the model's harness reads it. An atom without a
+// param has an empty one.
 const atomsOf = given => {
   const atoms = {}
   let editing = null
-  for (const [id, atom] of Object.entries(given ?? {})) {
+  for (const [id, written] of Object.entries(given ?? {})) {
+    const atom = {param: {}, ...written}
     const at = atom.text.indexOf("|")
     if (at === -1) atoms[id] = atom
     else {

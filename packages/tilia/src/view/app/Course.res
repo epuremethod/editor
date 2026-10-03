@@ -53,11 +53,12 @@ let section: Section.t = {
     ("q", ":: {{f2}}"),
   ],
   atoms: [
-    ("f1", "math\nU \\in \\tau"),
-    (
-      "f2",
-      "math\n\\bigcup_{i \\in I} U_i \\in \\tau \\quad\\text{for every family } (U_i)_{i \\in I} \\subseteq \\tau",
-    ),
+    {id: "f1", text: "math\nU \\in \\tau", param: Dict.make()},
+    {
+      id: "f2",
+      text: "math\n\\bigcup_{i \\in I} U_i \\in \\tau \\quad\\text{for every family } (U_i)_{i \\in I} \\subseteq \\tau",
+      param: Dict.make(),
+    },
   ],
 }
 
@@ -116,7 +117,7 @@ let change = (base: string, side: string) => {
 
 // A text both sides changed: two changes that do not overlap both land, and
 // the reader's text stands otherwise. Two insertions at one place land the
-// reader's first. A stand-in for lapa's merge, word by word, until the demo
+// reader's first. A stand-in for radif's merge, word by word, until the demo
 // can take it.
 let text = (~base: string, ~local: string, ~remote: string) =>
   if local == base {
@@ -143,41 +144,60 @@ let text = (~base: string, ~local: string, ~remote: string) =>
 // block or atom the reader typed is kept, one the reader removed and the
 // remote left alone stays removed, the remote one is taken otherwise, and
 // the remote order stands. A typed block the remote dropped
-// keeps its place after the block it followed on screen.
+// keeps its place after the block it followed on screen. A param merges
+// whole: the reader's stands when the reader changed it.
 let merge = (~base: Section.t, ~local: Section.t, ~remote: Section.t): Section.t => {
-  let entry = (held: array<(Doc.id, string)>, id) => held->Array.find(((other, _)) => other == id)
-  let three = (base, local, remote) => {
-    let typed = local->Array.filter(((id, text)) => entry(base, id) != Some((id, text)))
-    let out = remote->Array.filterMap(((id, theirs)) =>
-      switch (entry(typed, id), entry(base, id), entry(local, id)) {
-      | (Some((_, mine)), Some((_, was)), _) =>
-        Some((id, text(~base=was, ~local=mine, ~remote=theirs)))
+  let three = (base, local, remote, ~id, ~merged) => {
+    let entry = (entries, key) => entries->Array.find(other => id(other) == key)
+    let typed = local->Array.filter(mine => entry(base, id(mine)) != Some(mine))
+    let out = remote->Array.filterMap(theirs =>
+      switch (entry(typed, id(theirs)), entry(base, id(theirs)), entry(local, id(theirs))) {
+      | (Some(mine), Some(was), _) => Some(merged(~was, ~mine, ~theirs))
       | (Some(mine), None, _) => Some(mine)
-      | (None, Some((_, was)), None) if was == theirs => None
-      | (None, _, _) => Some((id, theirs))
+      | (None, Some(was), None) if was == theirs => None
+      | (None, _, _) => Some(theirs)
       }
     )
-    typed->Array.forEach(((id, text)) =>
-      if entry(remote, id) == None {
+    typed->Array.forEach(mine =>
+      if entry(remote, id(mine)) == None {
         let rec after = index =>
           switch local->Array.get(index) {
           | None => 0
-          | Some((previous, _)) =>
-            switch out->Array.findIndex(((other, _)) => other == previous) {
+          | Some(previous) =>
+            switch out->Array.findIndex(other => id(other) == id(previous)) {
             | -1 => after(index - 1)
             | at => at + 1
             }
           }
-        let index = local->Array.findIndex(((other, _)) => other == id)
-        out->Array.splice(~start=after(index - 1), ~remove=0, ~insert=[(id, text)])
+        let index = local->Array.findIndex(other => id(other) == id(mine))
+        out->Array.splice(~start=after(index - 1), ~remove=0, ~insert=[mine])
       }
     )
     out
   }
   {
     id: remote.id,
-    blocks: three(base.blocks, local.blocks, remote.blocks),
-    atoms: three(base.atoms, local.atoms, remote.atoms),
+    blocks: three(
+      base.blocks,
+      local.blocks,
+      remote.blocks,
+      ~id=((id, _)) => id,
+      ~merged=(~was as (_, was), ~mine as (id, mine), ~theirs as (_, theirs)) => (
+        id,
+        text(~base=was, ~local=mine, ~remote=theirs),
+      ),
+    ),
+    atoms: three(
+      base.atoms,
+      local.atoms,
+      remote.atoms,
+      ~id=(atom: Section.atom) => atom.id,
+      ~merged=(~was: Section.atom, ~mine: Section.atom, ~theirs: Section.atom) => {
+        id: mine.id,
+        text: text(~base=was.text, ~local=mine.text, ~remote=theirs.text),
+        param: mine.param != was.param ? mine.param : theirs.param,
+      },
+    ),
   }
 }
 

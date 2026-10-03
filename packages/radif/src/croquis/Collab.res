@@ -1,26 +1,28 @@
-open LapaDb.App
-open LapaDb.Data
+open RadifDb.App
+open RadifDb.Data
+open Radif.Query
 open Editor
 
-// Two people, one section: the croquis. The page opens a lapa client on the
-// session in its address and mounts today's `@tilia/editor` over one
+// Two people, one section: the croquis. The page opens a radif client on
+// the session in its address and mounts today's `@tilia/editor` over one
 // section. The founder finds or makes it under their Personal node and
 // invites every other member to edit it. A member joins with the admission
 // code in the address, waits for the offer, accepts it onto their Personal
-// node, and edits the same section. The section is read through
-// `@lapa/tilia`: the sections under the person's Personal node as one live
-// list, whose first is the one. Every act writes a copy of the record; the
-// binding folds what comes back, own write or other device, onto the live
-// record, and a watch on it lands the fold on the blocks it changed, and on
-// no other.
+// node, and edits the same section. Every read goes through `@radif/tilia`,
+// rows and edges, so what the page shows moves as the client's rows do:
+// the sections under the person's Personal node are one live list, whose
+// first is the one. Every act writes a copy of the record; the binding
+// folds what comes back, own write or other device, onto the live record,
+// and a watch on it lands the fold on the blocks it changed, and on no
+// other.
 
 @val @scope(("window", "location")) external search: string = "search"
 type params
 @new external params: string => params = "URLSearchParams"
 @send external asked: (params, string) => Nullable.t<string> = "get"
 
-let session = params(search)->asked("lapa-session")->Nullable.toOption
-let code = params(search)->asked("lapa-code")->Nullable.toOption
+let session = params(search)->asked("radif-session")->Nullable.toOption
+let code = params(search)->asked("radif-code")->Nullable.toOption
 
 // The session stays in the address and never in local storage, so two tabs
 // are two people. A redeemed code is spent, so the address takes the
@@ -33,68 +35,50 @@ let outcome = (run: Reply.outcome<'a> => unit): promise<'a> =>
     run({ok: resolve, error: message => reject(JsError.make(message))})
   )
 
-let found = (run: Reply.find<'a> => unit): promise<option<'a>> =>
-  Promise.make((resolve, reject) =>
-    run({
-      found: value => resolve(Some(value)),
-      missing: () => resolve(None),
-      error: message => reject(JsError.make(message)),
-    })
-  )
-
-let streamed = (run: Reply.stream<'a> => unit): promise<array<'a>> =>
-  Promise.make((resolve, reject) => {
-    let out = []
-    run({
-      entry: value => out->Array.push(value),
-      ended: () => resolve(out),
-      error: message => reject(JsError.make(message)),
-    })
-  })
-
-// The ids the client holds of one class.
-let ofClass = (client: Client.t, klass: Lapa.id) =>
-  streamed(stream =>
-    client.store.seek({field: Lapa.Root.Entity.klass, test: Is(JSON.String(klass))}, stream)
-  )
-
-// Where the person stands: the Domain their Account reads, at `admin` for
-// the founder and `read` for a member, and their own Inbox and Personal
-// node. The three are the nodes the Account links to, each of its class.
-type standing = {domain: Lapa.id, founder: bool, inbox: Lapa.id, personal: Lapa.id}
-
-let standing = async (client: Client.t) => {
-  let edges = await streamed(stream => client.graph.out(~from=client.actor, stream))
-  let linked = async klass => {
-    let ids = await ofClass(client, klass)
-    edges->Array.find(edge => ids->Array.includes(edge.to))
+let listed = loadable =>
+  switch loadable {
+  | Radif.Loaded({data}) => data
+  | _ => []
   }
-  switch (
-    await linked(Lapa.Root.domain),
-    await linked(Lapa.Root.inbox),
-    await linked(Lapa.Root.personal),
-  ) {
-  | (Some(domain), Some(inbox), Some(personal)) => {
-      domain: domain.to,
-      founder: domain.level == Lapa.Access.admin,
-      inbox: inbox.to,
-      personal: personal.to,
-    }
-  | _ => JsError.throwWithMessage("the client reaches no Domain, Inbox or Personal node")
-  }
-}
 
-// A field of a stored row, `None` where the row does not carry it.
-let field = (entity: Lapa.Entity.t, ~facet, ~field) =>
-  entity->Dict.get(facet)->Option.flatMap(part => part->Dict.get(field))
-
-let titleOf = (entity: Lapa.Entity.t) =>
-  switch field(entity, ~facet=Lapa.Root.titled, ~field=Lapa.Root.Titled.title) {
-  | Some(String(title)) => Some(title)
+let loaded = loadable =>
+  switch loadable {
+  | Radif.Loaded({data}) => Some(data)
   | _ => None
   }
 
-let opening: array<Lapa.entry<string>> = [
+// Where the person stands: the Domain their Account reads, at `admin` for
+// the founder and `read` for a member, and their own Inbox and Personal
+// node. The three are the nodes under the Account, each of its class.
+// `None` while the reads load.
+type standing = {domain: Radif.id, founder: bool, inbox: Radif.id, personal: Radif.id}
+
+let standing = (binding: RadifTilia.t, ~account) => {
+  let edges = binding.edges(Some(Edge.From(account)))
+  let domains = binding.load(Radif.under(RadifStore.Domain.klass)(account))
+  let inboxes = binding.load(Radif.under(RadifStore.Inbox.klass)(account))
+  let personals = binding.load(Radif.under(RadifStore.Personal.klass)(account))
+  switch (edges, domains, inboxes, personals) {
+  | (Loaded({data: edges}), Loaded({data: domains}), Loaded({data: inboxes}), Loaded({data: personals})) =>
+    switch (domains->Array.get(0), inboxes->Array.get(0), personals->Array.get(0)) {
+    | (Some(domain), Some(inbox), Some(personal)) =>
+      Some(
+        Ok({
+          domain: domain.entity.id,
+          founder: edges->Array.some(edge =>
+            edge.to == domain.entity.id && edge.level == Radif.Access.admin
+          ),
+          inbox: inbox.entity.id,
+          personal: personal.entity.id,
+        }),
+      )
+    | _ => Some(Error("the client reaches no Domain, Inbox or Personal node"))
+    }
+  | _ => None
+  }
+}
+
+let opening: array<Radif.entry<string>> = [
   {id: "a", value: "# Open sets"},
   {
     id: "b",
@@ -109,7 +93,7 @@ let opening: array<Lapa.entry<string>> = [
   {id: "f", value: ":: {{f1}}"},
 ]
 
-let openingAtoms: array<Lapa.placed<string>> = [
+let openingAtoms: array<Radif.placed<string>> = [
   {
     id: "f1",
     value: "math\n\\emptyset \\in \\tau \\quad\\text{and}\\quad X \\in \\tau",
@@ -117,46 +101,44 @@ let openingAtoms: array<Lapa.placed<string>> = [
   },
 ]
 
-let save = (client: Client.t, section: Course.Section.t) =>
-  outcome(reply => client.ops.upsert(~actor=client.actor, [Course.Section.record(section)], reply))
+let save = (client: Client.t, section: RadifStore.Section.t) =>
+  outcome(reply => client.upsert([RadifStore.Section.record(section)], reply))
 
 // The founder's first section, under their Personal node and first in it.
 let opened = (client: Client.t, standing: standing) =>
   save(
     client,
-    Course.Section.make(
+    RadifStore.Section.make(
       client.context,
       ~under=standing.personal,
       ~section={blocks: opening, atoms: openingAtoms},
-      ~ordered={parents: [{id: standing.personal, value: "a", param: Dict.make()}]},
+      ~attached={parents: [{id: standing.personal, value: "a", param: Dict.make()}]},
       ~titled={title: "Open sets"},
     ),
   )
 
 // ── the port ────────────────────────────────────────────────────────────
 
-// The port holds no param yet, so an atom written back keeps the param it
-// was read with.
-let port = (section: Course.Section.t): Section.t => {
+let port = (section: RadifStore.Section.t): Section.t => {
   id: section.entity.id,
   blocks: section.section.blocks->Array.map(entry => (entry.id, entry.value)),
-  atoms: section.section.atoms->Array.map(atom => (atom.id, atom.value)),
+  atoms: section.section.atoms->Array.map(({id, value, param}): Section.atom => {
+    id,
+    text: value,
+    param,
+  }),
 }
 
-let written = (section: Course.Section.t, port: Section.t): Course.Section.t => {
-  let params =
-    section.section.atoms->Array.map(atom => (atom.id, atom.param))->Dict.fromArray
-  {
-    ...section,
-    section: {
-      blocks: port.blocks->Array.map(((id, value)): Lapa.entry<string> => {id, value}),
-      atoms: port.atoms->Array.map(((id, value)): Lapa.placed<string> => {
-        id,
-        value,
-        param: params->Dict.get(id)->Option.getOr(Dict.make()),
-      }),
-    },
-  }
+let written = (section: RadifStore.Section.t, port: Section.t): RadifStore.Section.t => {
+  ...section,
+  section: {
+    blocks: port.blocks->Array.map(((id, value)): Radif.entry<string> => {id, value}),
+    atoms: port.atoms->Array.map(({id, text, param}): Radif.placed<string> => {
+      id,
+      value: text,
+      param,
+    }),
+  },
 }
 
 // ── the types ───────────────────────────────────────────────────────────
@@ -178,16 +160,16 @@ let types: dict<TiliaEditor.View.spec> = Dict.fromArray([("math", {TiliaEditor.V
 
 // Another member of the Domain, as the founder sees them: their Inbox, the
 // name their Author carries, and where the offer of the section stands.
-type other = {inbox: Lapa.id, name: string, mutable offered: option<Lapa.access>}
+type other = {inbox: Radif.id, name: string, offered: option<Radif.access>}
 
 type opened = {
   client: Client.t,
   standing: standing,
   state: TiliaEditor.View.state,
-  /** The other members, kept by the founder alone. */
-  mutable others: array<other>,
+  /** The other members, read by the founder alone. */
+  others: array<other>,
   /** The live record the binding hands out: every fold lands on it. */
-  section: Course.Section.t,
+  section: RadifStore.Section.t,
   mutable storage: Section.storage,
   mutable synced: bool,
   mutable saved: int,
@@ -250,7 +232,7 @@ let mapped = (offset, ~old: string, ~new_: string) => {
 // keeps the local text: what arrived is older than what the person typed,
 // and the next write carries it. The caret follows its block's text.
 // Answers how many blocks changed and how many were held.
-let arrive = (state: TiliaEditor.View.state, section: Course.Section.t, ~base: Section.t) => {
+let arrive = (state: TiliaEditor.View.state, section: RadifStore.Section.t, ~base: Section.t) => {
   let before = state.doc
   let fresh = Storage.read(port(section))
   let local = Storage.write(before, ~id=base.id).blocks->Dict.fromArray
@@ -309,63 +291,60 @@ let arrive = (state: TiliaEditor.View.state, section: Course.Section.t, ~base: S
 
 // ── the people ──────────────────────────────────────────────────────────
 
-// The other members, read off the Domain: every Inbox it links, but the
+// The other members, read off the Domain: every Inbox under it, but the
 // person's own, named by the Author who owns it, and the level the offer of
 // the section stands at, where one runs. An accepted offer moves onto the
 // member's Personal node, which the founder does not reach, so from here
 // an acceptance and no offer read the same: the founder's store cannot say
 // who edits the section.
-let others = async (client: Client.t, standing: standing, ~section: Lapa.id) => {
-  let edges = await streamed(stream => client.graph.out(~from=standing.domain, stream))
-  let inboxes = await ofClass(client, Lapa.Root.inbox)
-  let named = async inbox =>
-    switch await found(reply => client.store.get(inbox, reply)) {
-    | Some(row) =>
-      switch field(row, ~facet=Lapa.Root.owned, ~field=Lapa.Root.Owned.owner) {
-      | Some(String(author)) =>
-        (await found(reply => client.store.get(author, reply)))->Option.flatMap(titleOf)
-      | _ => None
-      }
-    | None => None
-    }
-  let members =
-    edges->Array.filter(edge => edge.to != standing.inbox && inboxes->Array.includes(edge.to))
-  let read = async (edge: Edge.t) =>
-    switch await named(edge.to) {
-    | Some(name) =>
-      let offer = await found(reply => client.graph.edge(~from=edge.to, ~to=section, reply))
-      Some({inbox: edge.to, name, offered: offer->Option.map(edge => edge.level)})
-    | None => None
-    }
-  (await Promise.all(members->Array.map(read)))->Array.filterMap(other => other)
+let others = (binding: RadifTilia.t, standing: standing, ~section: Radif.id) => {
+  let offers = binding.edges(Some(Edge.To(section)))->listed
+  binding.load(Radif.under(RadifStore.Inbox.klass)(standing.domain))
+  ->listed
+  ->Array.filter(inbox => inbox.entity.id != standing.inbox)
+  ->Array.filterMap(inbox =>
+    binding.load(RadifStore.Author.one->at(inbox.owned.owner))
+    ->loaded
+    ->Option.map(author => {
+      inbox: inbox.entity.id,
+      name: author.titled.title,
+      offered: offers
+      ->Array.find(edge => edge.from == inbox.entity.id)
+      ->Option.map(edge => edge.level),
+    })
+  )
 }
 
 // An offer standing in the person's Inbox: the node it runs to and the
 // title the sealed Invitation carries.
-type offer = {to: Lapa.id, title: string}
+type offer = {to: Radif.id, title: string}
 
-let offers = async (client: Client.t, standing: standing) => {
-  let edges = await streamed(stream => client.graph.out(~from=standing.inbox, stream))
-  let offered = edges->Array.filter(edge => edge.level == Lapa.Access.invited)
-  let read = async (edge: Edge.t) => {
-    let title = switch edge.payload {
-    | Some(payload) =>
-      (await found(reply => client.store.get(payload, reply)))->Option.flatMap(titleOf)
-    | None => None
-    }
-    {to: edge.to, title: title->Option.getOr("a section")}
-  }
-  await Promise.all(offered->Array.map(read))
-}
+let offers = (binding: RadifTilia.t, standing: standing) =>
+  binding.edges(Some(Edge.From(standing.inbox)))
+  ->listed
+  ->Array.filter(edge => edge.level == Radif.Access.invited)
+  ->Array.map(edge => {
+    to: edge.to,
+    title: edge.payload
+    ->Option.flatMap(payload => binding.load(RadifStore.Invitation.one->at(payload))->loaded)
+    ->Option.mapOr("a section", invitation => invitation.titled.title),
+  })
 
 // ── the editing ─────────────────────────────────────────────────────────
 
-let editing = (client: Client.t, standing: standing, first: Course.Section.t) => {
+let editing = (
+  client: Client.t,
+  binding: RadifTilia.t,
+  standing: standing,
+  first: RadifStore.Section.t,
+) => {
   let self = Tilia.tilia({
     client,
     standing,
     state: TiliaEditor.View.prepare(port(first)),
-    others: [],
+    others: Tilia.computed(() =>
+      standing.founder ? others(binding, standing, ~section=first.entity.id) : []
+    ),
     section: first,
     storage: {sections: [], update: _ => (), merge: (~base as _, ~local as _, ~remote) => remote},
     synced: false,
@@ -417,15 +396,6 @@ let editing = (client: Client.t, standing: standing, first: Course.Section.t) =>
     }
   )
   let _ = client.synced(synced => self.synced = synced)
-  // The founder's list of the others, read again after every delivery: a
-  // member who joins arrives as one.
-  let listed = () =>
-    if standing.founder {
-      others(client, standing, ~section=first.entity.id)
-      ->Promise.thenResolve(found => self.others = found)
-      ->Promise.ignore
-    }
-  listed()
   // The binding folds every answer onto the live record, own write or
   // other device, before any hook hears the delivery. The watch reads the
   // record's blocks and atoms, so it runs on a fold that moved one of them
@@ -441,36 +411,32 @@ let editing = (client: Client.t, standing: standing, first: Course.Section.t) =>
   // The deliveries are counted, and nothing else is done with them here.
   let _ = client.receives(delivery => {
     delivery.entities->Array.forEach(arrival =>
-      if Lapa.recordId(Lapa.unpack(arrival.remote)) == self.section.entity.id {
+      if Radif.recordId(Radif.unpack(arrival.remote)) == self.section.entity.id {
         self.received = self.received + 1
         if arrival.edit->Option.isSome {
           self.skipped = self.skipped + 1
         }
       }
     )
-    listed()
   })
   self
 }
 
 let invite = (opened: opened, other: other) =>
   outcome(reply =>
-    opened.client.ops.invite(
-      ~actor=opened.client.actor,
+    opened.client.invite(
       ~inbox=other.inbox,
       ~to=opened.section.entity.id,
-      ~level=Lapa.Access.edit,
+      ~level=Radif.Access.edit,
       reply,
     )
-  )
-  ->Promise.thenResolve(_ => other.offered = Some(Lapa.Access.invited))
-  ->Promise.ignore
+  )->Promise.ignore
 
 // ── the screens ─────────────────────────────────────────────────────────
 
 // What the page shows: the join form on a code, the wait on a session that
 // holds no section yet, the editor once one stands.
-type waiting = {client: Client.t, standing: standing, mutable offers: array<offer>}
+type waiting = {client: Client.t, standing: standing, offers: array<offer>}
 
 type screen =
   | Opening
@@ -488,54 +454,67 @@ let failed = error =>
     error->JsExn.fromException->Option.flatMap(JsExn.message)->Option.getOr("unknown"),
   )
 
-// The sections under the person's Personal node, as the binding answers
-// them: the founder's own, and the one an accepted offer lands there.
-type held = {sections: Lapa.loadable<array<Course.Section.t>>}
+// Where the person stands, and the sections under their Personal node, as
+// the binding answers them: the founder's own, and the one an accepted
+// offer lands there.
+type held = {
+  standing: option<result<standing, string>>,
+  sections: Radif.loadable<array<RadifStore.Section.t>>,
+}
 
 @val external later: (unit => unit, int) => unit = "setTimeout"
 
 // One browser database a session, as the board keeps it.
 let open_ = async (token: string) => {
-  let indexed = await outcome(reply => IndexedDbKv.make(~name=`lapa:${token}`, reply))
-  let client = await Client.make({base: "/_lapa", token, kv: indexed.kv})
-  Browse.make(client)->Promise.thenResolve(browse => page.browse = Some(browse))->Promise.ignore
-  let standing = await standing(client)
-  let binding = LapaTilia.make(~client, ~clock=SystemClock.make())
+  let indexed = await outcome(reply => IndexedDbKv.make(~name=`radif:${token}`, reply))
+  let client = await Client.make({base: "/_radif", token, kv: indexed.kv})
+  let binding = RadifTilia.make(~client, ~clock=SystemClock.make())
+  page.browse = Some(Browse.make(~actor=client.actor, ~binding))
   let held = Tilia.carve(({derived}) => {
-    sections: derived(_ => binding.load(Lapa.under(Course.Section.klass)(standing.personal))),
+    standing: derived(_ => standing(binding, ~account=client.actor)),
+    sections: derived(self =>
+      switch self.standing {
+      | Some(Ok(standing)) =>
+        binding.load(Radif.under(RadifStore.Section.klass)(standing.personal))
+      | _ => NotSet
+      }
+    ),
   })
-  let waiting = Tilia.tilia({client, standing, offers: []})
-  let looks = () =>
-    offers(client, standing)->Promise.thenResolve(found => waiting.offers = found)->Promise.ignore
-  let _ = client.receives(_ => looks())
   // The screen follows the list: the first section held opens the editor
   // on it; none opens the wait, and the founder makes one. The move runs
   // off the tracked read, so what the editor reads is not observed here.
   let making = ref(false)
   let _ = Tilia.observe(() =>
-    switch (held.sections, page.screen) {
-    | (Loaded(_), Editing(_)) => ()
-    | (Loaded({data}), _) =>
-      switch data->Array.get(0) {
-      | Some(first) => later(() => page.screen = Editing(editing(client, standing, first)), 0)
-      | None =>
-        if standing.founder && !making.contents {
+    switch (held.standing, held.sections, page.screen) {
+    | (_, _, Editing(_) | Failed(_)) => ()
+    | (Some(Error(message)), _, _) | (_, NoData({reason: Failed({message})}), _) =>
+      later(() => page.screen = Failed(message), 0)
+    | (Some(Ok(standing)), Loaded({data}), screen) =>
+      switch (data->Array.get(0), screen) {
+      | (Some(first), _) =>
+        later(() => page.screen = Editing(editing(client, binding, standing, first)), 0)
+      | (None, _) if standing.founder =>
+        if !making.contents {
           making := true
           later(() => opened(client, standing)->Promise.ignore, 0)
-        } else {
-          later(() => page.screen = Waiting(waiting), 0)
         }
+      | (None, Waiting(_)) => ()
+      | (None, _) =>
+        let waiting = Tilia.tilia({
+          client,
+          standing,
+          offers: Tilia.computed(() => offers(binding, standing)),
+        })
+        later(() => page.screen = Waiting(waiting), 0)
       }
-    | (NoData({reason: Failed({message})}), _) => later(() => page.screen = Failed(message), 0)
     | _ => ()
     }
   )
-  looks()
 }
 
 let accept = (client: Client.t, standing: standing, offer: offer) =>
   outcome(reply =>
-    client.ops.accept(~actor=client.actor, ~to=offer.to, ~anchor=standing.personal, reply)
+    client.accept(~to=offer.to, ~anchor=standing.personal, reply)
   )
   ->Promise.catch(error => {
     failed(error)
@@ -552,7 +531,7 @@ type response = {ok: bool}
 
 let join = async (code: string, name: string) => {
   let response = await fetch(
-    "/_lapa/member",
+    "/_radif/member",
     {
       method: "POST",
       headers: Dict.fromArray([("Content-Type", "application/json")]),
@@ -567,7 +546,7 @@ let join = async (code: string, name: string) => {
   ->JSON.Decode.object
   ->Option.flatMap(fields => fields->Dict.get("session")->Option.flatMap(JSON.Decode.string)) {
   | Some(token) =>
-    replaceState(Nullable.null, "", `?lapa-session=${token}`)
+    replaceState(Nullable.null, "", `?radif-session=${token}`)
     await open_(token)
   | None => JsError.throwWithMessage("the member answer names no session")
   }
@@ -606,8 +585,8 @@ module Others = {
           {switch other.offered {
           | None =>
             <button onClick={_ => invite(opened, other)}> {React.string("invite to edit")} </button>
-          | Some(level) if level == Lapa.Access.invited => React.string(" · invited")
-          | Some(level) => React.string(` · ${Lapa.Access.name(level)}s`)
+          | Some(level) if level == Radif.Access.invited => React.string(" · invited")
+          | Some(level) => React.string(` · ${Radif.Access.name(level)}s`)
           }}
         </li>
       )

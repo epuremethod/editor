@@ -6,11 +6,15 @@ open EpureVitest
 //
 // An act is a word, with its argument in parentheses: `backspace`, `delete`,
 // `enter`, `bold`, `link(/open-sets)`, `moveUp`, `paste(...)`,
+// `embed(image, r42)`, `place(f2, width=50%)`,
 // `input(For every ε| there is a δ.)`. The two arrows, `->` and `<-`, are
 // acts too. Several acts make a list. The argument of `paste` is a document
 // in the notation, one line per pasted block. The argument of `input` is one block as the browser left
 // it: plain text and the selection, with no marks, since the browser knows
 // none.
+
+// An atom as a fixture writes it. An atom without a param has an empty one.
+type given = {@as("type") type_: string, text: string, param?: dict<string>}
 
 // `atoms` is the dictionary the document starts with, and `atomsAfter`
 // what it holds after the acts; when absent, atoms are not compared.
@@ -18,8 +22,8 @@ type example = {
   before: string,
   @as("when") when_: JSON.t,
   after: string,
-  atoms?: dict<Doc.atom>,
-  atomsAfter?: dict<Doc.atom>,
+  atoms?: dict<given>,
+  atomsAfter?: dict<given>,
 }
 
 let actLine = /^(\w+|->|<-)(?:\((.*)\))?$/s
@@ -47,12 +51,17 @@ let enters: Edit.enters = atom => atom.type_ != "video"
 
 // The atoms of a scenario, with the box's caret: a pipe in an atom's
 // text is the caret, and the atom with it is the one being edited.
-let atomsOf = (given: option<dict<Doc.atom>>): (dict<Doc.atom>, option<Doc.editing>) => {
+let atomsOf = (given: option<dict<given>>): (dict<Doc.atom>, option<Doc.editing>) => {
   let atoms = Dict.make()
   let editing = ref(None)
   given
   ->Option.getOr(Dict.make())
-  ->Dict.forEachWithKey((atom, id) =>
+  ->Dict.forEachWithKey((given, id) => {
+    let atom: Doc.atom = {
+      type_: given.type_,
+      text: given.text,
+      param: given.param->Option.getOr(Dict.make()),
+    }
     switch atom.text->String.indexOf("|") {
     | -1 => atoms->Dict.set(id, atom)
     | offset =>
@@ -62,7 +71,7 @@ let atomsOf = (given: option<dict<Doc.atom>>): (dict<Doc.atom>, option<Doc.editi
       editing := Some({Doc.atom: id, offset})
       atoms->Dict.set(id, {...atom, text: atom.text->String.replace("|", "")})
     }
-  )
+  })
   (atoms, editing.contents)
 }
 
@@ -88,6 +97,19 @@ let twoParts = (argument: string, ~act) =>
   | at => (argument->String.slice(~start=0, ~end=at), argument->String.slice(~start=at + 2))
   }
 
+// A param as an act writes it: `width=50%, rotate=90`.
+let paramOf = (written: string): dict<string> =>
+  written
+  ->String.split(", ")
+  ->Array.filter(pair => pair != "")
+  ->Array.map(pair =>
+    switch pair->String.indexOf("=") {
+    | -1 => panic(`A param is key=value pairs, not ${pair}`)
+    | at => (pair->String.slice(~start=0, ~end=at), pair->String.slice(~start=at + 1))
+    }
+  )
+  ->Dict.fromArray
+
 let act = (doc: Doc.t, said: string) => {
   let (name, argument) = switch actLine->RegExp.exec(said->String.trim) {
   | Some(found) =>
@@ -112,6 +134,12 @@ let act = (doc: Doc.t, said: string) => {
   | ("insert", Some(argument)) =>
     let (type_, text) = twoParts(argument, ~act="insert")
     Edit.insert(doc, ~id=mintAtoms(doc, 1)->Array.getUnsafe(0), ~type_, ~text)
+  | ("embed", Some(argument)) =>
+    let (type_, text) = twoParts(argument, ~act="embed")
+    Edit.embed(doc, ~atom=mintAtoms(doc, 1)->Array.getUnsafe(0), ~block=mint(doc), ~type_, ~text)
+  | ("place", Some(argument)) =>
+    let (id, param) = twoParts(argument, ~act="place")
+    Edit.place(doc, ~id, ~param=paramOf(param))
   | ("click", Some(block)) =>
     let {doc: placed} = Notation.read(block, ~plain=true)
     switch (doc.selection, placed.selection) {

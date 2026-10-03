@@ -10,7 +10,7 @@ to its storage.
 ## The image is a record
 
 An image is not text, and it does not live in the section. The storage
-keeps it as a record of its own. With lapa, the record is a row of the
+keeps it as a record of its own. With radif, the record is a row of the
 root class `Image`, with these fields:
 
 | Field | From | What it holds |
@@ -62,7 +62,7 @@ The atom's type rides on the first line of its text, as it does today. The
 rest of the text is the source: the LaTeX of a formula, over as many lines
 as it needs, or the id of an image record. The param is the placement: how
 wide the image shows, or how it turns. Most atoms hold an empty param, and
-an empty param writes nothing. The app owns the keys. Lapa checks that the
+an empty param writes nothing. The app owns the keys. Radif checks that the
 param is an object of texts, and it reads no key. The rule of the atom's
 type decodes and encodes it.
 
@@ -74,8 +74,8 @@ who resizes it both land, since they change different parts of the entry.
 Two who resize it conflict, and the local param stands.
 
 Only a list takes a param, and only when its field's definition says
-`param`. `atoms` says it, and the app reads it through `Lapa.placed`.
-`blocks` does not, and the app reads it through `Lapa.entries`. The flag is
+`param`. `atoms` says it, and the app reads it through `Radif.placed`.
+`blocks` does not, and the app reads it through `Radif.entries`. The flag is
 frozen with the definition, like `many`.
 
 A section requires `Ordered`, since it always sits in a document. `Ordered`
@@ -86,7 +86,7 @@ section needs no title: its heading, when it has one, is a block. The
 document is the app's own class, which requires `Titled` and `Ordered`. The
 top document, the course, may skip `Ordered`.
 
-The lapa croquis stores the root `Section` and defines no class of its own.
+The radif croquis stores the root `Section` and defines no class of its own.
 It has no document: `parents` names the reader's Personal node, which is a
 record too. The editor's port does not carry a param yet. The croquis reads
 each atom's text, and it writes the atom back with the param it read. The
@@ -99,7 +99,7 @@ Four parts share the work:
   declares, and it knows nothing of what that rule loads.
 - **`storage/binding`** is the code that fills the editor's storage port.
   It loads an image record, and it turns a pasted file into an atom.
-- **`app`** is the top layer: the demo, or a course over lapa. It declares
+- **`app`** is the top layer: the demo, or a course over radif. It declares
   the `image` rule, keeps the loading states and draws them.
 
 ## The layers
@@ -271,7 +271,7 @@ one does. The only difference is that the bytes are already on the device.
 
 The blob lives in the storage. It never lives in the editor or in the
 atom. In the demo, it sits in a map in memory, under the record's id. With
-lapa, it sits in the client's blob store, `config.blobs`, under the
+radif, it sits in the client's blob store, `config.blobs`, under the
 object's key. `client.bytes(~row, blob)` keeps the blob and answers the
 value that the record's `bytes` field holds. The client uploads the blob
 before the push that names it, and the push carries the value only.
@@ -300,7 +300,7 @@ device. At `Ready`, `storage/binding` swaps the blob for the stored URL and
 drops it.
 
 A bar shows the upload until the image is `Ready`. A refused save starts
-the upload again, back at 0. With lapa, the client mints a new object key,
+the upload again, back at 0. With radif, the client mints a new object key,
 rewrites the record, and uploads again under that key. An offline device stays at 0 until it is back
 online. Nothing here is an error. An image is local first, like the text
 around it.
@@ -308,7 +308,7 @@ around it.
 ### The description is required
 
 A pasted image has a title, the file's name, but no description. So it
-cannot be a complete record until the reader writes one. With lapa, the
+cannot be a complete record until the reader writes one. With radif, the
 pasted image is a draft: a row of `Image` that carries the `Draft` part.
 A draft is stored and synced, and it does not have to meet the record's
 requirements yet. The row becomes a record when the reader writes the
@@ -316,7 +316,7 @@ description.
 
 ## The demo
 
-The demo has no storage and no lapa. It declares its own `image` rule, and
+The demo has no storage and no radif. It declares its own `image` rule, and
 its `storage/binding` keeps the records and the blobs in memory. On a
 paste, the binding reads the size from the decoded image and moves the
 upload from 0 to 100 and on to `Ready` on a timer, so a
@@ -332,16 +332,16 @@ reader can watch the image travel. It stores nothing.
 - `paste(file)`: makes an image record from a file and returns its atom at
   once.
 
-Lapa already gives the binding what it stands on:
+Radif already gives the binding what it stands on:
 
 - the root classes `Image` and `Section`, and the facets `Sized` and
   `Ordered`;
-- a list of atoms whose entries carry a param, read as `Lapa.placed`;
+- a list of atoms whose entries carry a param, read as `Radif.placed`;
 - `client.bytes`, which keeps a pasted blob until the push that names it
   lands, and `client.open_`, which reads the kept blob or the stored bytes;
 - a draft, which holds the bytes before the description is written.
 
-Lapa does not report how far an upload or a download has gone yet. The
+Radif does not report how far an upload or a download has gone yet. The
 `percent` of the model needs it.
 
 ## Not yet

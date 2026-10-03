@@ -38,7 +38,8 @@ Hello world
 - The act is a word, with its argument in parentheses: `backspace`,
   `delete`, `enter`, `bold`, `italic`, `code`, `link(/open-sets)`,
   `heading(2)`, `paragraph`, `item`, `display`, `moveUp`, `moveDown`,
-  `paste(...)`, `insert(math, U \in \tau)`, `edit(a8f1, U \in \tau)` and
+  `paste(...)`, `insert(math, U \in \tau)`, `edit(a8f1, U \in \tau)`,
+  `embed(image, r42)`, `place(f2, width=50%, rotate=90)` and
   `input(For every ε| there is a δ.)`. Several
   acts make a list: `[enter, enter]`. The two arrows, `->` and `<-`, are acts
   too. The argument of `input` is plain text: the browser knows no marks, so
@@ -50,6 +51,8 @@ Hello world
   mints takes `e1`, then `e2`. A pipe in an atom's text is the caret of
   the box under it, so the box is open on that atom at that offset.
   The course writes a literal bar as `\lvert` or `\mid`.
+- An atom may carry a `param`: a dictionary of texts, such as
+  `{width: 50%}`. An atom without one has an empty param.
 - An id between double braces in a line, such as `{{`a8f1`}}`, is a
   reference: characters of the plain text under a mark of its own. It is
   read before the selection markers, so a selection may open right before
@@ -206,3 +209,25 @@ paragraph above and its atom lands inline. Enter at its end opens a
 paragraph under it. In the editor the form is Cmd+Alt+4.
 
 {{displayOps}}
+
+## Embed
+
+`embed` puts a new atom in a new display block, under the block that
+contains the caret. The text of that block stays whole, and a selection
+stays as text. An empty paragraph becomes the display block itself and
+keeps its id. The caret lands after the atom, and an open box closes. The
+core never makes the atom: the code that fills the port makes it, from a
+pasted file, and the core places it. `embed` knows no image, and it serves
+any atom that draws as a block.
+
+{{embedOps}}
+
+## Place
+
+An atom has a param beside its text: a dictionary of texts that the app
+owns, such as the width of an image. `place` replaces the whole param of
+an atom. It changes no block and no text.
+The core never reads a key. It stores the param, compares it and hands it
+to the port, and a pasted reference copies it with its atom.
+
+{{placeOps}}

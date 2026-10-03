@@ -30,10 +30,10 @@ type point = {block: id, offset: int}
 // has one state per side, and `pending` says which.
 type selection = {anchor: point, focus: point, pending: array<kind>}
 
-// An atom: a type the host knows, and a text the type reads. A formula is
-// an atom of type math whose text is its LaTeX source. The core knows no
-// type.
-type atom = {@as("type") type_: string, text: string}
+// An atom: a type the host knows, a text the type reads, and a param the
+// app owns. A formula is an atom of type math whose text is its LaTeX
+// source. The core knows no type and reads no key of a param.
+type atom = {@as("type") type_: string, text: string, param: dict<string>}
 
 // The box: an atom whose source is being edited, and the caret in it. It
 // exists only for a type that enters. The block selection stays where the

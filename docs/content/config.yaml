@@ -59,7 +59,7 @@ var:
       </main>
     </body>
     </html>
-  port: 55283
+  port: 54873
 build:
   - output: "{{output}}/index.html"
     input: "{{shell}}"
@@ -94,6 +94,8 @@ build:
       itemOps: { value: item, transform: operations }
       referenceOps: { value: reference, transform: operations }
       displayOps: { value: display, transform: operations }
+      embedOps: { value: embed, transform: operations }
+      placeOps: { value: place, transform: operations }
       pageBody: { file: pages/OPERATIONS.md, transform: docsMd }
       operationsToc: { file: pages/OPERATIONS.md, transform: docsToc }
       operationsCurrent: ' aria-current="page"'

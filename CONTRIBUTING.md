@@ -1,7 +1,7 @@
 # Contributing
 
 This project follows the [épure](https://epuremethod.com) method, as the
-sibling repository `../sylva` does. Its `CONTRIBUTING.md` is the source of
+sibling repository `../radif` does. Its `CONTRIBUTING.md` is the source of
 the method; this file says how the method lands here.
 
 ## Working agreement
@@ -25,8 +25,8 @@ editor. What the editor is lives there; what it refused lives in
 
 One pnpm workspace. The root holds no code. The directory under `packages/`
 is the package's own name: `packages/editor` is `@epure/editor`,
-`packages/tilia` is `@tilia/editor`, and `packages/lapa` will be
-`@lapa/editor`. The dependency runs one way, from the core out.
+`packages/tilia` is `@tilia/editor`, and `packages/radif` will be
+`@radif/editor`. The dependency runs one way, from the core out.
 
 - `packages/editor/` is the core, package `@epure/editor`, namespace
   `Editor`: the types, the pure model, the notation, markdown in and out, and
@@ -35,9 +35,9 @@ is the package's own name: `packages/editor` is `@epure/editor`,
   `TiliaEditor`: React over contentEditable, input events into acts, the
   block views keyed by id through tilia. It is built here so that its shape
   can move, and migrates to tilia's own repository once it has settled.
-- `packages/lapa/` will fill the port with rows, package `@lapa/editor`. It
-  migrates to sylva once it has settled. Until sylva publishes the lapa
-  packages it needs, it links to `../sylva/packages/*`.
+- `packages/radif/` will fill the port with rows, package `@radif/editor`.
+  It migrates to radif once it has settled. Until radif publishes the
+  packages it needs, it links to `../radif/packages/*`.
 - `docs/` builds the site with `@epure/minidoc`. The Operations page draws
   its cards from the core's fixtures, so a card and its test cannot drift
   apart.

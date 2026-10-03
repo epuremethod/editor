@@ -1,5 +1,5 @@
 Read `CONTRIBUTING.md` before changing the project. It holds the épure
-method as it lands here, shared with `../sylva`.
+method as it lands here, shared with `../radif`.
 
 Read `docs/content/pages/EDITOR.md` before changing the editor. It settles
 the vocabulary, the model, the input layer and the order of work.

@@ -63,6 +63,20 @@ Feature: Typed text
       | a8f1 | math | U \subseteq X |
     And the port receives nothing
 
+  Scenario: Placing an atom records typed text for that atom
+    Given a section
+      | block | text                                |
+      | a     | An open cover of the unit interval: |
+      | b     | :: {{f2}}║                          |
+    And its atoms
+      | atom | type  | source | param |
+      | f2   | image | r42    |       |
+    When the person places atom "f2" at "width=50%"
+    Then the typed text is
+      | atom | type  | source | param     |
+      | f2   | image | r42    | width=50% |
+    And the port receives nothing
+
   Scenario: Changing a mark records typed text for the block
     Given a section
       | block | text                              |

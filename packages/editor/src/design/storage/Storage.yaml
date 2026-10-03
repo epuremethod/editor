@@ -140,6 +140,15 @@ examples:
     canonicalAtoms:
       a8f1: "math\n"
 
+  - scenario: an atom's param crosses the port beside its text
+    atoms:
+      f2:
+        text: "image\nr42"
+        param: {width: 50%, rotate: '90'}
+    blocks:
+      - "An open cover of the unit interval:"
+      - ":: {{f2}}"
+
   - scenario: an edit of an atom hands the section back with its atoms
     given: an editor over a section
     atoms:

@@ -1,17 +1,22 @@
 // The two crossings of the port: a section read into the model, and the
 // model written back as a section. Markdown on the outside, runs inside.
-// An atom's type is its first line on the outside and a field inside.
+// An atom's type is its first line on the outside and a field inside. Its
+// param crosses as it is.
 
 let readAtom = (text: string): Doc.atom =>
   switch text->String.indexOf("\n") {
-  | -1 => {type_: text, text: ""}
-  | at => {type_: text->String.slice(~start=0, ~end=at), text: text->String.slice(~start=at + 1)}
+  | -1 => {type_: text, text: "", param: Dict.make()}
+  | at => {
+      type_: text->String.slice(~start=0, ~end=at),
+      text: text->String.slice(~start=at + 1),
+      param: Dict.make(),
+    }
   }
 
 let writeAtom = (atom: Doc.atom) => atom.type_ ++ "\n" ++ atom.text
 
 let readAtoms = (atoms: array<Section.atom>): dict<Doc.atom> =>
-  atoms->Array.map(((id, text)) => (id, readAtom(text)))->Dict.fromArray
+  atoms->Array.map(({id, text, param}) => (id, {...readAtom(text), param}))->Dict.fromArray
 
 // Sorted by id, so two copies of a section agree on the order of a field
 // whose order means nothing.
@@ -19,7 +24,7 @@ let writeAtoms = (atoms: dict<Doc.atom>): array<Section.atom> =>
   atoms
   ->Dict.toArray
   ->Array.toSorted(((a, _), (b, _)) => String.compare(a, b))
-  ->Array.map(((id, atom)) => (id, writeAtom(atom)))
+  ->Array.map(((id, atom)): Section.atom => {id, text: writeAtom(atom), param: atom.param})
 
 let read = (section: Section.t): Doc.t => {
   blocks: section.blocks->Array.map(((id, line)) => {

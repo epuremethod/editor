@@ -44,17 +44,20 @@ importers:
         specifier: ^3.2.4
         version: 3.2.7(yaml@2.9.0)
 
-  packages/lapa:
+  packages/radif:
     dependencies:
       '@epure/editor':
         specifier: workspace:^
         version: link:../editor
-      '@lapa/db':
-        specifier: link:../../../sylva/packages/db
-        version: link:../../../sylva/packages/db
-      '@lapa/tilia':
-        specifier: link:../../../sylva/packages/tilia
-        version: link:../../../sylva/packages/tilia
+      '@radif/db':
+        specifier: link:../../../radif/packages/db
+        version: link:../../../radif/packages/db
+      '@radif/tilia':
+        specifier: link:../../../radif/packages/tilia
+        version: link:../../../radif/packages/tilia
+      '@radif/types':
+        specifier: link:../../../radif/packages/types
+        version: link:../../../radif/packages/types
       '@tilia/editor':
         specifier: workspace:^
         version: link:../tilia
@@ -64,13 +67,10 @@ importers:
       katex:
         specifier: ^0.18.9
         version: 0.18.9
-      lapa:
-        specifier: link:../../../sylva/packages/lapa
-        version: link:../../../sylva/packages/lapa
     devDependencies:
-      '@lapa/server':
-        specifier: link:../../../sylva/packages/server
-        version: link:../../../sylva/packages/server
+      '@radif/server':
+        specifier: link:../../../radif/packages/server
+        version: link:../../../radif/packages/server
       '@rescript/react':
         specifier: ^0.15.0
         version: 0.15.0(@rescript/runtime@12.3.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)

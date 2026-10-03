@@ -1,78 +1,66 @@
-open LapaDb.App
-open LapaDb.Data
+open RadifDb.Data
+open Radif.Query
 
 // A small browser over the client's own database. The Account is the one
 // node nothing points to, so every node the client holds hangs under it.
 // The browser walks down the edges from there, one row an edge, and keeps
-// the path in local storage so a reload opens where the person left.
+// the path in local storage so a reload opens where the person left. Every
+// read goes through the binding, so the rows move as the client's do.
 
 @val @scope("localStorage") external kept: string => Nullable.t<string> = "getItem"
 @val @scope("localStorage") external keep: (string, string) => unit = "setItem"
-let key = "lapa-browse"
+let key = "radif-browse"
 
-let found = (run: Reply.find<'a> => unit): promise<option<'a>> =>
-  Promise.make((resolve, reject) =>
-    run({
-      found: value => resolve(Some(value)),
-      missing: () => resolve(None),
-      error: message => reject(JsError.make(message)),
-    })
-  )
+type node = {id: Radif.id, klass: option<Radif.id>, title: string, icon: array<Radif.Icon.layer>}
+type row = {node: node, level: Radif.access}
+type t = {
+  actor: Radif.id,
+  /** The ids walked down from the Account, the Account left out. */
+  mutable ids: array<Radif.id>,
+  path: array<node>,
+  rows: array<row>,
+}
 
-let streamed = (run: Reply.stream<'a> => unit): promise<array<'a>> =>
-  Promise.make((resolve, reject) => {
-    let out = []
-    run({
-      entry: value => out->Array.push(value),
-      ended: () => resolve(out),
-      error: message => reject(JsError.make(message)),
-    })
-  })
-
-type node = {id: Lapa.id, klass: option<Lapa.id>, title: string, icon: array<Lapa.Icon.layer>}
-type row = {node: node, level: Lapa.access}
-type t = {client: Client.t, mutable path: array<node>, mutable rows: array<row>}
-
-let field = (entity: Lapa.Entity.t, ~facet, ~field) =>
+let field = (entity: Radif.Entity.t, ~facet, ~field) =>
   entity->Dict.get(facet)->Option.flatMap(part => part->Dict.get(field))
 
 let classOf = entity =>
-  switch field(entity, ~facet=Lapa.Root.entity, ~field=Lapa.Root.Entity.klass) {
+  switch field(entity, ~facet=Radif.Root.entity, ~field=Radif.Root.Entity.klass) {
   | Some(String(id)) => Some(id)
   | _ => None
   }
 
 let titleOf = entity =>
-  switch field(entity, ~facet=Lapa.Root.titled, ~field=Lapa.Root.Titled.title) {
+  switch field(entity, ~facet=Radif.Root.titled, ~field=Radif.Root.Titled.title) {
   | Some(String(title)) => Some(title)
   | _ => None
   }
 
 let iconOf = entity =>
-  switch field(entity, ~facet=Lapa.Root.iconed, ~field=Lapa.Root.Iconed.icon) {
+  switch field(entity, ~facet=Radif.Root.iconed, ~field=Radif.Root.Iconed.icon) {
   | Some(json) =>
-    Lapa.Entry.list(json)
+    Radif.Entry.list(json)
     ->Option.getOr([])
     ->Array.filterMap(({id, value}) =>
-      value->JSON.Decode.string->Option.map((value): Lapa.entry<string> => {id, value})
+      value->JSON.Decode.string->Option.map((value): Radif.entry<string> => {id, value})
     )
-    ->Lapa.Icon.layers
+    ->Radif.Icon.layers
   | None => []
   }
 
-let section = Lapa.Root.section
+let section = Radif.Root.section
 
 // The roots the croquis meets, by name, for a class row the client does
 // not hold.
 let names = Dict.fromArray([
-  (Lapa.Root.account, "Account"),
-  (Lapa.Root.inbox, "Inbox"),
-  (Lapa.Root.author, "Author"),
-  (Lapa.Root.personal, "Personal"),
-  (Lapa.Root.domain, "Domain"),
-  (Lapa.Root.app, "App"),
-  (Lapa.Root.invitation, "Invitation"),
-  (Lapa.Root.klass, "Class"),
+  (Radif.Root.account, "Account"),
+  (Radif.Root.inbox, "Inbox"),
+  (Radif.Root.author, "Author"),
+  (Radif.Root.personal, "Personal"),
+  (Radif.Root.domain, "Domain"),
+  (Radif.Root.app, "App"),
+  (Radif.Root.invitation, "Invitation"),
+  (Radif.Root.klass, "Class"),
   (section, "Section"),
 ])
 
@@ -87,43 +75,51 @@ let cube = [
 let drawings =
   [
     (
-      Lapa.Root.account,
+      Radif.Root.account,
       [
         stroke("M31 31a19 19 0 1 0 38 0a19 19 0 1 0 -38 0Z"),
         stroke("M16 91c0 -19 15 -28 34 -28s34 9 34 28"),
       ],
     ),
     (
-      Lapa.Root.personal,
+      Radif.Root.personal,
       [stroke("M12 53 50 19l38 34"), stroke("M25 47V88h50V47"), stroke("M41 88V63h18v25")],
     ),
     (
-      Lapa.Root.inbox,
+      Radif.Root.inbox,
       [stroke("M12 59h22l6 13h20l6 -13h22"), stroke("M12 59v25h76V59"), stroke("M22 59 31 28h38l9 31")],
     ),
     (
-      Lapa.Root.domain,
+      Radif.Root.domain,
       [
         stroke("M13 50a37 37 0 1 0 74 0a37 37 0 1 0 -74 0Z"),
         stroke("M34 50a16 37 0 1 0 32 0a16 37 0 1 0 -32 0Z"),
         stroke("M13 50h74"),
       ],
     ),
-    (Lapa.Root.author, [stroke("M19 81l6 -25 44 -44 19 19 -44 44Z"), stroke("M59 28 72 41")]),
-    (Lapa.Root.invitation, [stroke("M12 25h76v56H12Z"), stroke("M12 28l38 31 38 -31")]),
+    (Radif.Root.author, [stroke("M19 81l6 -25 44 -44 19 19 -44 44Z"), stroke("M59 28 72 41")]),
+    (Radif.Root.invitation, [stroke("M12 25h76v56H12Z"), stroke("M12 28l38 31 38 -31")]),
     (section, [stroke("M19 25h62M19 44h62M19 63h44M19 81h31")]),
-    (Lapa.Root.app, cube),
-    (Lapa.Root.klass, cube),
+    (Radif.Root.app, cube),
+    (Radif.Root.klass, cube),
   ]
-  ->Array.map(((klass, layers)) => (klass, layers->Array.filterMap(Lapa.Icon.parse)))
+  ->Array.map(((klass, layers)) => (klass, layers->Array.filterMap(Radif.Icon.parse)))
   ->Dict.fromArray
 
-let dot = ["primary fill M34 50a16 16 0 1 0 32 0a16 16 0 1 0 -32 0Z"]->Array.filterMap(Lapa.Icon.parse)
+let dot = ["primary fill M34 50a16 16 0 1 0 32 0a16 16 0 1 0 -32 0Z"]->Array.filterMap(Radif.Icon.parse)
+
+// A row by its id, a draft's too, as the store holds it. `None` while it
+// loads, and where the client does not hold it.
+let row = (binding: RadifTilia.t, id) =>
+  switch binding.load(Radif.one(Radif.klassOfId(Radif.Root.entity))->withDrafts->at(id)) {
+  | Loaded({data}) => Some(Radif.pack(data))
+  | _ => None
+  }
 
 // A class by its row: the title, and the icon it carries or the drawing
 // the croquis keeps for it.
-let klassOf = async (client: Client.t, klass) => {
-  let row = await found(reply => client.store.get(klass, reply))
+let klassOf = (binding, klass) => {
+  let row = row(binding, klass)
   let name =
     row
     ->Option.flatMap(titleOf)
@@ -137,12 +133,12 @@ let klassOf = async (client: Client.t, klass) => {
 }
 
 // A node: its own title and icon, or its class's.
-let node = async (client: Client.t, id) =>
-  switch await found(reply => client.store.get(id, reply)) {
+let node = (binding, id) =>
+  switch row(binding, id) {
   | Some(entity) =>
     let klass = classOf(entity)
     let (className, classIcon) = switch klass {
-    | Some(klass) => await klassOf(client, klass)
+    | Some(klass) => klassOf(binding, klass)
     | None => ("a node", dot)
     }
     let icon = switch iconOf(entity) {
@@ -153,31 +149,29 @@ let node = async (client: Client.t, id) =>
   | None => {id, klass: None, title: "not held", icon: dot}
   }
 
-let rows = async (client: Client.t, from) => {
-  let edges = await streamed(stream => client.graph.out(~from, stream))
-  await Promise.all(
-    edges->Array.map(async (edge: Edge.t) => {node: await node(client, edge.to), level: edge.level}),
-  )
-}
+let edges = (binding: RadifTilia.t, from) =>
+  switch binding.edges(Some(Edge.From(from))) {
+  | Loaded({data}) => data
+  | _ => []
+  }
 
 let last = path => path->Array.last->Option.getOrThrow
 
-let show = async (self: t, path) => {
-  let below = await rows(self.client, last(path).id)
-  self.path = path
-  self.rows = below
-  let ids = path->Array.slice(~start=1)->Array.map(node => node.id)
+let show = (self: t, ids) => {
+  self.ids = ids
   keep(key, JSON.stringifyAny(ids)->Option.getOr("[]"))
 }
 
-let descend = (self, row: row) => show(self, [...self.path, row.node])->Promise.ignore
+let descend = (self, row: row) =>
+  show(self, [...self.path->Array.slice(~start=1)->Array.map(node => node.id), row.node.id])
 
-let climb = (self, at) => show(self, self.path->Array.slice(~start=0, ~end=at + 1))->Promise.ignore
+let climb = (self, at) =>
+  show(self, self.path->Array.slice(~start=1, ~end=at + 1)->Array.map(node => node.id))
 
-// The kept path, walked down from the Account: each id has to hang under
-// the one before, so a path into rows since removed stops where it fails.
-let make = async (client: Client.t) => {
-  let root = await node(client, client.actor)
+// The path is the kept ids walked down from the Account: each id has to
+// hang under the one before, so a path into rows since removed stops where
+// it fails, and grows back while the edges load.
+let make = (~actor, ~binding) => {
   let ids =
     kept(key)
     ->Nullable.toOption
@@ -188,20 +182,25 @@ let make = async (client: Client.t) => {
     )
     ->Option.getOr([])
     ->Array.filterMap(JSON.Decode.string)
-  let rec walk = async (path, ids) =>
-    switch ids->Array.get(0) {
-    | None => path
-    | Some(next) =>
-      let below = await rows(client, last(path).id)
-      switch below->Array.find(row => row.node.id == next) {
-      | Some(row) => await walk([...path, row.node], ids->Array.slice(~start=1))
-      | None => path
-      }
-    }
-  let self = Tilia.tilia({client, path: [root], rows: []})
-  await show(self, await walk([root], ids))
-  let _ = client.receives(_ => show(self, self.path)->Promise.ignore)
-  self
+  Tilia.carve(({derived}) => {
+    actor,
+    ids,
+    path: derived(self => {
+      let rec walk = (path, ids) =>
+        switch ids->Array.get(0) {
+        | Some(next) if edges(binding, last(path).id)->Array.some(edge => edge.to == next) =>
+          walk([...path, node(binding, next)], ids->Array.slice(~start=1))
+        | _ => path
+        }
+      walk([node(binding, actor)], self.ids)
+    }),
+    rows: derived(self =>
+      edges(binding, last(self.path).id)->Array.map(edge => {
+        node: node(binding, edge.to),
+        level: edge.level,
+      })
+    ),
+  })
 }
 
 // An id as two short groups of its base64: characters 8 and 9 are the
@@ -209,10 +208,10 @@ let make = async (client: Client.t) => {
 // one moment, and 12 to 15 are three random bytes, which tell rows apart.
 // The tenant comes first only where it is not the Account's own.
 @val external btoa: string => string = "btoa"
-let tag = (self: t, id: Lapa.id) => {
+let tag = (self: t, id: Radif.id) => {
   let text = btoa(id)
   let tenant =
-    Lapa.tenant(id) == Lapa.tenant(self.client.actor)
+    Radif.tenant(id) == Radif.tenant(self.actor)
       ? ""
       : text->String.slice(~start=0, ~end=6) ++ "·"
   tenant ++ text->String.slice(~start=8, ~end=10) ++ "·" ++ text->String.slice(~start=12, ~end=16)
@@ -222,14 +221,14 @@ let tag = (self: t, id: Lapa.id) => {
 // reaches the page only as `d`. The box reaches past the grid by a tenth
 // on each side, so a stroke on the grid's edge is not cut.
 module Drawn = {
-  let colour = (role: Lapa.Icon.role) =>
+  let colour = (role: Radif.Icon.role) =>
     switch role {
     | Primary => "var(--icon-primary)"
     | Secondary => "var(--icon-secondary)"
     }
 
   @react.component
-  let make = (~layers: array<Lapa.Icon.layer>, ~size: int) =>
+  let make = (~layers: array<Radif.Icon.layer>, ~size: int) =>
     <svg
       className="icon"
       width={size->Int.toString}
@@ -256,7 +255,7 @@ module Drawn = {
     </svg>
 }
 
-let levelIcon = level => Lapa.Access.icon(level)->Array.filterMap(Lapa.Icon.parse)
+let levelIcon = level => Radif.Access.icon(level)->Array.filterMap(Radif.Icon.parse)
 
 module View = {
   @react.component
@@ -284,7 +283,7 @@ module View = {
             <span className="title"> {React.string(row.node.title)} </span>
             <span className="sep"> {React.string("/")} </span>
             <span className="id"> {React.string(tag(browse, row.node.id))} </span>
-            <span className="level" title={Lapa.Access.name(row.level)}>
+            <span className="level" title={Radif.Access.name(row.level)}>
               <Drawn layers={levelIcon(row.level)} size=16 />
             </span>
           </li>

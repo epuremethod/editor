@@ -9,10 +9,13 @@ let mint = mint(state)
 let mintAtom = mintAtom(state)
 let collaborator = Collaborator.make(section)
 
+// An atom as a fixture writes it. An atom without a param has an empty one.
+type given = {@as("type") type_: string, text: string, param?: dict<string>}
+
 // The hook a browser test drives: load a document in the notation with its
 // atoms, read it back in the notation, and read its atoms.
 type hook = {
-  load: (string, Nullable.t<dict<Doc.atom>>, Nullable.t<Doc.editing>) => unit,
+  load: (string, Nullable.t<dict<given>>, Nullable.t<Doc.editing>) => unit,
   notation: bool => string,
   atoms: unit => dict<Doc.atom>,
   editing: unit => Nullable.t<Doc.editing>,
@@ -26,7 +29,14 @@ window->expose({
       state,
       {
         ...Notation.read(source).doc,
-        atoms: atoms->Nullable.toOption->Option.getOr(Dict.make()),
+        atoms: atoms
+        ->Nullable.toOption
+        ->Option.getOr(Dict.make())
+        ->Dict.mapValues((atom): Doc.atom => {
+          type_: atom.type_,
+          text: atom.text,
+          param: atom.param->Option.getOr(Dict.make()),
+        }),
         editing: editing->Nullable.toOption,
       },
     ),

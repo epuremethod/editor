@@ -258,3 +258,15 @@ examples:
       See {{zz99}}| for the proof.
     atomsAfter:
       a8f1: {type: math, text: 'U \in \tau'}
+
+  - scenario: a pasted reference copies its atom's param
+    atoms:
+      f2: {type: image, text: r42, param: {width: 50%}}
+    before: |
+      The same cover, drawn again: |
+    when: "paste({{f2}})"
+    after: |
+      The same cover, drawn again: {{e1}}|
+    atomsAfter:
+      f2: {type: image, text: r42, param: {width: 50%}}
+      e1: {type: image, text: r42, param: {width: 50%}}
