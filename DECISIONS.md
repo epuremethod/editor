@@ -175,3 +175,32 @@ and lapa both model an explicit write. Refused: naming the acts that save.
 A paste saves or not by its shape.
 
 Costs the host one call, `save`, and the tilia binding a way to expose it.
+
+## 2026-09-30 — An atom carries a param the core never reads
+
+An atom is `{id, text, param}`, and the param is a required dictionary of
+texts that the app owns. The core stores it, compares it, writes it through
+the port and copies it on paste. It never reads a key. `place` replaces it
+whole and keeps the block list, so it waits for the host's save.
+
+Refused: the param inside the text, as a line after the type. A text merges
+whole, so a reader who resizes an image would conflict with one who changes
+it. Refused: the param in a table the host keeps. A save dropped it, a paste
+lost it, and a resize was neither typed nor merged. Refused: an optional
+`param?`. Absent and empty would be two forms of one value.
+
+Costs every atom an empty dictionary, and every fixture atom with a param
+the `{text, param}` form.
+
+## 2026-09-30 — `embed` places a new atom in a display block
+
+`embed` takes an atom id and a block id that the caller mints. An empty
+paragraph becomes the display block and keeps its id. Any other block stays
+whole, and the new display block goes after it.
+
+Refused: `embed` as `split`, `insert` and `display` in a row. A split cuts
+the sentence at the caret, and an empty paragraph would take a new block
+instead of becoming one.
+
+Costs the caller two ids, and the browser suite skips the card: no key
+puts a file on the clipboard.

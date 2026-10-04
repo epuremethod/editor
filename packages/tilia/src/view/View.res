@@ -48,6 +48,11 @@ type spec = {render: render, enter?: bool, widget?: widget}
 let plain: render = (atom, ~display as _) =>
   <span className="source"> {React.string(atom.text)} </span>
 
+// What the host makes of a pasted file: the type and the text of a new
+// atom, or nothing when it takes no file of that kind.
+type pasted = {type_: string, text: string}
+type paste = Browser.file => option<pasted>
+
 // The spec of an atom's type; a type the host did not name shows its
 // source and enters.
 let specOf = (types: dict<spec>, atom: Doc.atom) =>
@@ -435,6 +440,7 @@ let make = (
   ~mint: option<unit => string>=?,
   ~mintAtom: option<unit => string>=?,
   ~types: dict<spec>=Dict.make(),
+  ~paste: option<paste>=?,
 ) => {
   TiliaReact.useTilia()
   let own = React.useMemo0(() =>
@@ -559,6 +565,24 @@ let make = (
         apply(doc => Edit.select(doc, ~anchor, ~focus))
       }
     )
+
+  // A paste that holds a file the host takes: the atom it answers goes in
+  // a display block, and the text the paste also holds goes nowhere, since
+  // it is most often the file's name.
+  let onPaste = (event: Browser.event) =>
+    switch (paste, event->Browser.clipboard->Nullable.toOption) {
+    | (Some(paste), Some(transfer)) =>
+      switch transfer->Browser.files->Array.findMap(paste) {
+      | Some({type_, text}) =>
+        Browser.prevent(event)
+        sync()
+        let atom = mintAtom()
+        let block = mint()
+        apply(doc => Edit.embed(doc, ~atom, ~block, ~type_, ~text))
+      | None => ()
+      }
+    | _ => ()
+    }
 
   let onBeforeInput = (event: Browser.event) => {
     sync()
@@ -702,6 +726,7 @@ let make = (
     | Some(node) =>
       node->Browser.on("beforeinput", onBeforeInput)
       node->Browser.on("input", onInput)
+      node->Browser.on("paste", onPaste)
       let onSelection = _ =>
         switch root.current->Nullable.toOption {
         | Some(root) if !state.composing =>
@@ -718,6 +743,7 @@ let make = (
         () => {
           node->Browser.off("beforeinput", onBeforeInput)
           node->Browser.off("input", onInput)
+          node->Browser.off("paste", onPaste)
           Browser.unlisten("selectionchange", onSelection)
         },
       )

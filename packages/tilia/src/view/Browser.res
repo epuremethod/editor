@@ -49,6 +49,14 @@ type transfer
 @get external transfer: event => Nullable.t<transfer> = "dataTransfer"
 @send external getData: (transfer, string) => string = "getData"
 
+// A file the clipboard holds, as the browser hands it over.
+type file
+type fileList
+@get external clipboard: event => Nullable.t<transfer> = "clipboardData"
+@get external fileList: transfer => fileList = "files"
+@val @scope("Array") external fromFiles: fileList => array<file> = "from"
+let files = (transfer: transfer) => transfer->fileList->fromFiles
+
 let isText = (node: node) => nodeType(node) == 3
 
 // An atom is an element the browser may not edit, standing for the

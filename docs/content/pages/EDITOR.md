@@ -434,29 +434,35 @@ The evaluator trigger on a relation change, sibling of the trigger on an
 the inline markdown reader and writer, the notation, every edit on the
 Operations page, and the port with its two crossings. Blocks have four
 forms, prose, heading, item and display, and a section holds its atoms
-beside its blocks, each named by a reference. The core holds the current
+beside its blocks, each named by a reference. An atom carries a param that
+the app owns and the core never reads; `embed` adds an atom in a display
+block, and `place` replaces its param. The core holds the current
 row and the displayed document, and reads the typed text as what the
 document holds that the row does not. An act that keeps the block list
 leaves the save to the host; any other act saves at once. A row that lands
 goes through the port's `merge` with the row and the displayed section, and
-the answer is displayed. A hundred and seventy-five scenarios pass with no
+the answer is displayed. A hundred and eighty-six scenarios pass with no
 browser.
 
 `@tilia/editor` exists as an experiment in this workspace, to move to tilia's
 own once its shape has settled. It renders one section, headings and lists
 included, splits input by type between the browser and the model, rebuilds
 the block the browser touched, keeps the model's selection level with the
-DOM's, draws each atom through a type the host injects, and hands the
+DOM's, draws each atom through a type the host injects, hands a pasted
+file to the host and embeds the atom it returns, and hands the
 changed section to the port after every act; it does not call the core's
 save or landing yet. The Demo page of this site is that editor over the
 page itself, with what the port received under it and a simulated
 collaborator whose rows land through the core. A hundred and eighteen of
-the cards run in Chrome through the same fixtures; eight are skipped
+the cards run in Chrome through the same fixtures; seventeen are skipped
 because no key drives them. Composition is wired
 and untested, and Safari and Firefox are untouched.
 
-`@radif/editor` holds only a croquis: two browsers share a section through
-`@radif/tilia`. Nothing on the rows and reach pages is built.
+`@radif/editor` holds only a croquis. The founder makes a Document with
+one Section and offers it at `edit`. A member accepts and reaches the
+Section through `@radif/tilia`. In Chrome the founder's first push is
+refused today: radif's client can push the edges before the rows. Nothing
+on the rows and reach pages is built.
 `@radif/db` merges a record field by field; diff3 on a text field and the
 keyed array's sequence merge are still to write there.
 
@@ -469,7 +475,7 @@ keyed array's sequence merge are still to write there.
 | Copy and paste | paste from plain text; copy and HTML to come |
 | Undo | not started |
 | Block forms: headings and items | done |
-| Formulas and embeds | formulas done; embeds drawn by type, rows not bound |
+| Formulas and embeds | formulas done; the param, `embed` and `place` done; image rows not bound |
 | Typed text and a landed row | done in the core; the view to move onto it |
 | Radif: text diff3, the sequence merge, rows through the port | not started |
 

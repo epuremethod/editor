@@ -34,9 +34,9 @@ The atom says where and how the section shows the image. The record says
 what the image is. So the section never holds bytes, and any viewer that
 knows the image record can draw it.
 
-A section names its document through `Ordered`. A pasted image carries no
-`Ordered`: the atom names it, and no list shows it. A photo that a reader
-uploads to a project carries `Ordered`, so the project's list shows it.
+A section names its document through `Attached`. A pasted image carries no
+`Attached`: the atom names it, and no list shows it. A photo that a reader
+uploads to a project carries `Attached`, so the project's list shows it.
 
 The storage may name the bytes by a key that changes, for example when an
 upload is refused and starts again under a new key. The record takes the
@@ -78,19 +78,21 @@ Only a list takes a param, and only when its field's definition says
 `blocks` does not, and the app reads it through `Radif.entries`. The flag is
 frozen with the definition, like `many`.
 
-A section requires `Ordered`, since it always sits in a document. `Ordered`
-has one field, `parents`, a list with a param. Each entry names a parent,
-its value is the position, and its param is the app's. The sections of a
-document are one indexed seek back along `parents`, in position order. A
-section needs no title: its heading, when it has one, is a block. The
-document is the app's own class, which requires `Titled` and `Ordered`. The
-top document, the course, may skip `Ordered`.
+A section requires `Attached`, since it always sits in a document.
+`Attached` has one field, `parents`, a list with a param. Each entry names a
+parent, its value is the position, and its param is the app's. The sections
+of a document are one indexed seek back along `parents`, in position order.
+A section needs no title: its heading, when it has one, is a block. The
+document is the root class `Document`, which requires `Titled` and takes
+`Attached` when it sits in another document. Its `extension` says what it
+opens as, such as `course`. The top document, the course, carries no
+`Attached`.
 
-The radif croquis stores the root `Section` and defines no class of its own.
-It has no document: `parents` names the reader's Personal node, which is a
-record too. The editor's port does not carry a param yet. The croquis reads
-each atom's text, and it writes the atom back with the param it read. The
-port gains the param with the `image` rule.
+The radif croquis stores the root `Document` and `Section`, and defines no
+class of its own. The founder's client makes one Document under their
+Personal node, and one Section under it whose `parents` names it. The port
+carries the param: the croquis reads each atom's text and param, and writes
+both back.
 
 Four parts share the work:
 
@@ -334,8 +336,8 @@ reader can watch the image travel. It stores nothing.
 
 Radif already gives the binding what it stands on:
 
-- the root classes `Image` and `Section`, and the facets `Sized` and
-  `Ordered`;
+- the root classes `Document`, `Image` and `Section`, and the facets
+  `Sized` and `Attached`;
 - a list of atoms whose entries carry a param, read as `Radif.placed`;
 - `client.bytes`, which keeps a pasted blob until the push that names it
   lands, and `client.open_`, which reads the kept blob or the stored bytes;

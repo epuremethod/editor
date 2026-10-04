@@ -3,15 +3,16 @@ open RadifDb.Data
 open Radif.Query
 open Editor
 
-// Two people, one section: the croquis. The page opens a radif client on
-// the session in its address and mounts today's `@tilia/editor` over one
-// section. The founder finds or makes it under their Personal node and
-// invites every other member to edit it. A member joins with the admission
-// code in the address, waits for the offer, accepts it onto their Personal
-// node, and edits the same section. Every read goes through `@radif/tilia`,
-// rows and edges, so what the page shows moves as the client's rows do:
-// the sections under the person's Personal node are one live list, whose
-// first is the one. Every act writes a copy of the record; the binding
+// Two people, one document: the croquis. The page opens a radif client on
+// the session in its address and mounts today's `@tilia/editor` over the
+// document's first section. The founder finds or makes the document under
+// their Personal node, with one section attached to it, and invites every
+// other member to edit the document. A member joins with the admission code
+// in the address, waits for the offer, accepts it onto their Personal node,
+// and edits the same section. Every read goes through `@radif/tilia`, rows
+// and edges, so what the page shows moves as the client's rows do: the
+// documents under the person's Personal node are one live list, and the
+// sections attached to its first are another. Every act writes a copy of the record; the binding
 // folds what comes back, own write or other device, onto the live record,
 // and a watch on it lands the fold on the blocks it changed, and on no
 // other.
@@ -104,18 +105,43 @@ let openingAtoms: array<Radif.placed<string>> = [
 let save = (client: Client.t, section: RadifStore.Section.t) =>
   outcome(reply => client.upsert([RadifStore.Section.record(section)], reply))
 
-// The founder's first section, under their Personal node and first in it.
-let opened = (client: Client.t, standing: standing) =>
-  save(
-    client,
-    RadifStore.Section.make(
-      client.context,
-      ~under=standing.personal,
-      ~section={blocks: opening, atoms: openingAtoms},
-      ~attached={parents: [{id: standing.personal, value: "a", param: Dict.make()}]},
-      ~titled={title: "Open sets"},
-    ),
+// The founder's first document, under their Personal node, and its one
+// section under it and attached to it.
+let opened = (client: Client.t, standing: standing) => {
+  let document = RadifStore.Document.make(
+    client.context,
+    ~under=standing.personal,
+    ~document={extension: "course"},
+    ~titled={title: "Open sets"},
   )
+  let section = RadifStore.Section.make(
+    client.context,
+    ~under=document.entity.id,
+    ~section={blocks: opening, atoms: openingAtoms},
+    ~attached={parents: [{id: document.entity.id, value: "a", param: Dict.make()}]},
+  )
+  outcome(reply =>
+    client.upsert(
+      [RadifStore.Document.record(document), RadifStore.Section.record(section)],
+      reply,
+    )
+  )
+}
+
+// The sections attached to a document, in their position under it.
+let sections = (binding: RadifTilia.t, ~document: Radif.id) =>
+  switch binding.load(RadifStore.Section.all->from(RadifStore.Attached.parents)->at(document)) {
+  | Loaded({claim, data}) =>
+    let position = (section: RadifStore.Section.t) =>
+      section.attached.parents
+      ->Array.find(parent => parent.id == document)
+      ->Option.mapOr("", parent => parent.value)
+    Radif.Loaded({
+      claim,
+      data: data->Array.toSorted((a, b) => String.compare(position(a), position(b))),
+    })
+  | other => other
+  }
 
 // ── the port ────────────────────────────────────────────────────────────
 
@@ -159,12 +185,14 @@ let types: dict<TiliaEditor.View.spec> = Dict.fromArray([("math", {TiliaEditor.V
 // ── the page ────────────────────────────────────────────────────────────
 
 // Another member of the Domain, as the founder sees them: their Inbox, the
-// name their Author carries, and where the offer of the section stands.
+// name their Author carries, and where the offer of the document stands.
 type other = {inbox: Radif.id, name: string, offered: option<Radif.access>}
 
 type opened = {
   client: Client.t,
   standing: standing,
+  /** The document the section is attached to: what the founder shares. */
+  document: RadifStore.Document.t,
   state: TiliaEditor.View.state,
   /** The other members, read by the founder alone. */
   others: array<other>,
@@ -293,12 +321,12 @@ let arrive = (state: TiliaEditor.View.state, section: RadifStore.Section.t, ~bas
 
 // The other members, read off the Domain: every Inbox under it, but the
 // person's own, named by the Author who owns it, and the level the offer of
-// the section stands at, where one runs. An accepted offer moves onto the
+// the document stands at, where one runs. An accepted offer moves onto the
 // member's Personal node, which the founder does not reach, so from here
 // an acceptance and no offer read the same: the founder's store cannot say
-// who edits the section.
-let others = (binding: RadifTilia.t, standing: standing, ~section: Radif.id) => {
-  let offers = binding.edges(Some(Edge.To(section)))->listed
+// who edits the document.
+let others = (binding: RadifTilia.t, standing: standing, ~document: Radif.id) => {
+  let offers = binding.edges(Some(Edge.To(document)))->listed
   binding.load(Radif.under(RadifStore.Inbox.klass)(standing.domain))
   ->listed
   ->Array.filter(inbox => inbox.entity.id != standing.inbox)
@@ -327,7 +355,7 @@ let offers = (binding: RadifTilia.t, standing: standing) =>
     to: edge.to,
     title: edge.payload
     ->Option.flatMap(payload => binding.load(RadifStore.Invitation.one->at(payload))->loaded)
-    ->Option.mapOr("a section", invitation => invitation.titled.title),
+    ->Option.mapOr("a document", invitation => invitation.titled.title),
   })
 
 // ── the editing ─────────────────────────────────────────────────────────
@@ -336,14 +364,16 @@ let editing = (
   client: Client.t,
   binding: RadifTilia.t,
   standing: standing,
+  document: RadifStore.Document.t,
   first: RadifStore.Section.t,
 ) => {
   let self = Tilia.tilia({
     client,
     standing,
+    document,
     state: TiliaEditor.View.prepare(port(first)),
     others: Tilia.computed(() =>
-      standing.founder ? others(binding, standing, ~section=first.entity.id) : []
+      standing.founder ? others(binding, standing, ~document=document.entity.id) : []
     ),
     section: first,
     storage: {sections: [], update: _ => (), merge: (~base as _, ~local as _, ~remote) => remote},
@@ -426,7 +456,7 @@ let invite = (opened: opened, other: other) =>
   outcome(reply =>
     opened.client.invite(
       ~inbox=other.inbox,
-      ~to=opened.section.entity.id,
+      ~to=opened.document.entity.id,
       ~level=Radif.Access.edit,
       reply,
     )
@@ -454,11 +484,12 @@ let failed = error =>
     error->JsExn.fromException->Option.flatMap(JsExn.message)->Option.getOr("unknown"),
   )
 
-// Where the person stands, and the sections under their Personal node, as
-// the binding answers them: the founder's own, and the one an accepted
-// offer lands there.
+// Where the person stands, the documents under their Personal node, and
+// the sections attached to the first, as the binding answers them: the
+// founder's own document, and the one an accepted offer lands there.
 type held = {
   standing: option<result<standing, string>>,
+  documents: Radif.loadable<array<RadifStore.Document.t>>,
   sections: Radif.loadable<array<RadifStore.Section.t>>,
 }
 
@@ -472,34 +503,64 @@ let open_ = async (token: string) => {
   page.browse = Some(Browse.make(~actor=client.actor, ~binding))
   let held = Tilia.carve(({derived}) => {
     standing: derived(_ => standing(binding, ~account=client.actor)),
-    sections: derived(self =>
+    documents: derived(self =>
       switch self.standing {
       | Some(Ok(standing)) =>
-        binding.load(Radif.under(RadifStore.Section.klass)(standing.personal))
+        binding.load(Radif.under(RadifStore.Document.klass)(standing.personal))
+      | _ => NotSet
+      }
+    ),
+    sections: derived(self =>
+      switch self.documents {
+      | Loaded({data}) =>
+        switch data->Array.get(0) {
+        | Some(document) => sections(binding, ~document=document.entity.id)
+        | None => NotSet
+        }
       | _ => NotSet
       }
     ),
   })
-  // The screen follows the list: the first section held opens the editor
-  // on it; none opens the wait, and the founder makes one. The move runs
-  // off the tracked read, so what the editor reads is not observed here.
+  // The screen follows the lists: the first section of the first document
+  // opens the editor on it; no document opens the wait, and the founder
+  // makes one. The move runs off the tracked read, so what the editor reads
+  // is not observed here.
   let making = ref(false)
   let _ = Tilia.observe(() =>
-    switch (held.standing, held.sections, page.screen) {
-    | (_, _, Editing(_) | Failed(_)) => ()
-    | (Some(Error(message)), _, _) | (_, NoData({reason: Failed({message})}), _) =>
+    switch (held.standing, held.documents, held.sections, page.screen) {
+    | (_, _, _, Editing(_) | Failed(_)) => ()
+    | (Some(Error(message)), _, _, _)
+    | (_, NoData({reason: Failed({message})}), _, _)
+    | (_, _, NoData({reason: Failed({message})}), _) =>
       later(() => page.screen = Failed(message), 0)
-    | (Some(Ok(standing)), Loaded({data}), screen) =>
-      switch (data->Array.get(0), screen) {
-      | (Some(first), _) =>
-        later(() => page.screen = Editing(editing(client, binding, standing, first)), 0)
-      | (None, _) if standing.founder =>
+    | (Some(Ok(standing)), Loaded({data: documents}), sections, screen) =>
+      switch (documents->Array.get(0), sections, screen) {
+      | (Some(document), Loaded({data}), _) =>
+        switch data->Array.get(0) {
+        | Some(first) =>
+          later(
+            () => page.screen = Editing(editing(client, binding, standing, document, first)),
+            0,
+          )
+        | None => ()
+        }
+      | (Some(_), _, _) => ()
+      | (None, _, _) if standing.founder =>
         if !making.contents {
           making := true
-          later(() => opened(client, standing)->Promise.ignore, 0)
+          later(
+            () =>
+              opened(client, standing)
+              ->Promise.catch(error => {
+                failed(error)
+                Promise.resolve()
+              })
+              ->Promise.ignore,
+            0,
+          )
         }
-      | (None, Waiting(_)) => ()
-      | (None, _) =>
+      | (None, _, Waiting(_)) => ()
+      | (None, _, _) =>
         let waiting = Tilia.tilia({
           client,
           standing,
@@ -599,7 +660,7 @@ module Editor = {
   @react.component
   let make = (~opened: opened) =>
     <main>
-      <h1> {React.string(opened.section.titled->Option.mapOr("", titled => titled.title))} </h1>
+      <h1> {React.string(opened.document.titled.title)} </h1>
       <TiliaEditor.View
         state=opened.state section={port(opened.section)} storage=opened.storage types
       />
