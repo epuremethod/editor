@@ -172,15 +172,19 @@ let written = (section: RadifStore.Section.t, port: Section.t): RadifStore.Secti
 type katexOptions = {displayMode: bool, throwOnError: bool}
 @module("katex") external renderToString: (string, katexOptions) => string = "renderToString"
 
-let math: TiliaEditor.View.render = (atom, ~display) =>
-  <span
-    className="math"
-    dangerouslySetInnerHTML={{
-      "__html": renderToString(atom.text, {displayMode: display, throwOnError: false}),
-    }}
-  />
+let math = TiliaEditor.Rule.make({
+  param: TiliaEditor.Rule.raw,
+  first: atom => atom,
+  render: (atom, ~param as _, ~display) =>
+    <span
+      className="math"
+      dangerouslySetInnerHTML={{
+        "__html": renderToString(atom.text, {displayMode: display, throwOnError: false}),
+      }}
+    />,
+})
 
-let types: dict<TiliaEditor.View.spec> = Dict.fromArray([("math", {TiliaEditor.View.render: math})])
+let rules = Dict.fromArray([("math", math)])
 
 // ── the page ────────────────────────────────────────────────────────────
 
@@ -208,11 +212,8 @@ type opened = {
   /** Deliveries that met this device's own write still in its outbox: the
       client answers the outbox's row, so the fold changes nothing. */
   mutable skipped: int,
-  /** The section as it was last written: the base a delivery is laid
-      against, so a block changed here since then keeps the local text. */
-  mutable base: Section.t,
-  /** The latest section an act produced and nothing wrote yet. */
-  mutable pending: option<Section.t>,
+  /** Typed text that nothing wrote yet. */
+  mutable pending: bool,
   /** The pause: restarted by every act, fires when the person stops. */
   mutable quiet: option<timeoutId>,
   /** The cap: started by the first unsaved change, restarted by nothing. */
@@ -234,87 +235,24 @@ let atMost = 1_000
 
 // ── the arrival ─────────────────────────────────────────────────────────
 
-// A caret through the change from one text to the next: before the changed
-// span it stays, after it it moves by the difference, inside it it lands at
-// the span's start.
-let mapped = (offset, ~old: string, ~new_: string) => {
-  let oldLength = String.length(old)
-  let prefix = Edit.commonPrefix(old, new_, ~max=oldLength)
-  let suffix = Edit.commonSuffix(
-    old,
-    new_,
-    ~max=Math.Int.min(oldLength, String.length(new_)) - prefix,
-  )
-  if offset <= prefix {
-    offset
-  } else if offset >= oldLength - suffix {
-    offset + (String.length(new_) - oldLength)
-  } else {
-    prefix
+// A block or an atom changed here since the last write keeps the local
+// one: what arrived is older than what the person typed, and the next write
+// carries it. Anything else takes what arrived.
+let merge = (~base: Section.t, ~local: Section.t, ~remote: Section.t): Section.t => {
+  let keep = (base, local, remote, ~key) => {
+    let find = (entries, id) => entries->Array.find(entry => key(entry) == id)
+    remote->Array.map(entry =>
+      switch (find(base, key(entry)), find(local, key(entry))) {
+      | (Some(was), Some(here)) if was != here => here
+      | _ => entry
+      }
+    )
   }
-}
-
-// The live record onto the view: a block whose text and form did not move
-// keeps its object and its DOM, a block that did is rebuilt, and so is a
-// block whose atom changed. A block changed here since the last write
-// keeps the local text: what arrived is older than what the person typed,
-// and the next write carries it. The caret follows its block's text.
-// Answers how many blocks changed and how many were held.
-let arrive = (state: TiliaEditor.View.state, section: RadifStore.Section.t, ~base: Section.t) => {
-  let before = state.doc
-  let fresh = Storage.read(port(section))
-  let local = Storage.write(before, ~id=base.id).blocks->Dict.fromArray
-  let written = base.blocks->Dict.fromArray
-  let heldHere = id => local->Dict.get(id) != written->Dict.get(id)
-  let held = []
-  let changedAtoms =
-    fresh.atoms
-    ->Dict.toArray
-    ->Array.filterMap(((id, atom)) => before.atoms->Dict.get(id) == Some(atom) ? None : Some(id))
-  let changed = []
-  let blocks = fresh.blocks->Array.map(block =>
-    switch Doc.block(before, block.id) {
-    | Some(old) if heldHere(block.id) =>
-      held->Array.push(block.id)
-      old
-    | Some(old)
-      if old.form == block.form &&
-      old.content == block.content &&
-      !(
-        block.content.marks->Array.some(mark =>
-          switch mark.kind {
-          | Ref(id) => changedAtoms->Array.includes(id)
-          | _ => false
-          }
-        )
-      ) => old
-    | _ =>
-      changed->Array.push(block.id)
-      block
-    }
-  )
-  let point = (point: Doc.point): Doc.point =>
-    switch (Doc.block(before, point.block), Doc.block(fresh, point.block)) {
-    | (Some(old), Some(new_)) if changed->Array.includes(point.block) => {
-        ...point,
-        offset: mapped(point.offset, ~old=old.content.text, ~new_=new_.content.text),
-      }
-    | (_, Some(_)) => point
-    | (_, None) =>
-      // The block is gone: the caret lands at the start of the first one.
-      switch fresh.blocks->Array.get(0) {
-      | Some(first) => {block: first.id, offset: 0}
-      | None => point
-      }
-    }
-  let selection = before.selection->Option.map(selection => {
-    ...selection,
-    anchor: point(selection.anchor),
-    focus: point(selection.focus),
-  })
-  changed->Array.forEach(id => TiliaEditor.View.bump(state, id))
-  state.doc = {...before, blocks, atoms: fresh.atoms, selection}
-  (changed->Array.length, held->Array.length)
+  {
+    id: remote.id,
+    blocks: keep(base.blocks, local.blocks, remote.blocks, ~key=((id, _)) => id),
+    atoms: keep(base.atoms, local.atoms, remote.atoms, ~key=(atom: Section.atom) => atom.id),
+  }
 }
 
 // ── the people ──────────────────────────────────────────────────────────
@@ -371,7 +309,7 @@ let editing = (
     client,
     standing,
     document,
-    state: TiliaEditor.View.prepare(port(first)),
+    state: TiliaEditor.View.prepare(port(first), ~rules),
     others: Tilia.computed(() =>
       standing.founder ? others(binding, standing, ~document=document.entity.id) : []
     ),
@@ -382,40 +320,31 @@ let editing = (
     received: 0,
     changed: 0,
     skipped: 0,
-    base: port(first),
-    pending: None,
+    pending: false,
     quiet: None,
     cap: None,
     held: 0,
   })
   let flush = () =>
-    switch self.pending {
-    | None => ()
-    | Some(latest) =>
-      self.pending = None
+    if self.pending {
+      self.pending = false
       self.quiet->Option.forEach(clearTimeout)
       self.cap->Option.forEach(clearTimeout)
       self.quiet = None
       self.cap = None
-      self.base = latest
-      save(client, written(self.section, latest))
-      ->Promise.thenResolve(() => self.saved = self.saved + 1)
-      ->Promise.ignore
+      TiliaEditor.View.save(self.state, self.storage)
     }
   let storage: Section.storage = {
     sections: [port(first)],
     update: sections =>
       sections->Array.forEach(changed =>
         if changed.id == self.section.entity.id {
-          self.pending = Some(changed)
-          self.quiet->Option.forEach(clearTimeout)
-          self.quiet = Some(setTimeout(flush, pause))
-          if self.cap == None {
-            self.cap = Some(setTimeout(flush, atMost))
-          }
+          save(client, written(self.section, changed))
+          ->Promise.thenResolve(() => self.saved = self.saved + 1)
+          ->Promise.ignore
         }
       ),
-    merge: (~base as _, ~local as _, ~remote) => remote,
+    merge,
   }
   self.storage = storage
   onWindow("blur", flush)
@@ -432,11 +361,25 @@ let editing = (
   // and lands the fold on the view.
   let _ = Tilia.watch(
     () => port(self.section),
-    _ => {
-      let (changed, held) = arrive(self.state, self.section, ~base=self.base)
-      self.changed = self.changed + changed
+    section => {
+      let held = TiliaEditor.View.typed(self.state).blocks->Array.length
+      let changed = TiliaEditor.View.land(self.state, self.storage, section)
+      self.changed = self.changed + changed->Array.length
       self.held = self.held + held
     },
+  )
+  // Typed text starts the pause and the cap; a save clears it.
+  let _ = Tilia.watch(
+    () => TiliaEditor.View.typed(self.state),
+    typed =>
+      if typed.blocks->Array.length > 0 || typed.atoms->Array.length > 0 {
+        self.pending = true
+        self.quiet->Option.forEach(clearTimeout)
+        self.quiet = Some(setTimeout(flush, pause))
+        if self.cap == None {
+          self.cap = Some(setTimeout(flush, atMost))
+        }
+      },
   )
   // The deliveries are counted, and nothing else is done with them here.
   let _ = client.receives(delivery => {
@@ -625,7 +568,7 @@ module Status = {
         ` · changed ${opened.changed->Int.toString}` ++
         ` · held ${opened.held->Int.toString}` ++
         ` · skipped ${opened.skipped->Int.toString}` ++ (
-          opened.pending == None ? "" : " · unsaved"
+          opened.pending ? " · unsaved" : ""
         ),
       )}
     </p>
@@ -661,9 +604,7 @@ module Editor = {
   let make = (~opened: opened) =>
     <main>
       <h1> {React.string(opened.document.titled.title)} </h1>
-      <TiliaEditor.View
-        state=opened.state section={port(opened.section)} storage=opened.storage types
-      />
+      <TiliaEditor.View state=opened.state storage=opened.storage />
       <Status opened />
       {opened.standing.founder ? <Others opened /> : React.null}
     </main>

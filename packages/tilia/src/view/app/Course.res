@@ -62,41 +62,45 @@ let section: Section.t = {
   ],
 }
 
-// The types the demo knows. A formula draws through KaTeX, inline or in
+// The rules the demo knows. A formula draws through KaTeX, inline or in
 // display mode by its place, and enters the editor's box. A video draws
-// its placement and opens a widget of its own on a click: here a plain
+// its placement and opens an editor of its own on a click: here a plain
 // field over its JSON, since the demo has no player.
 type katexOptions = {displayMode: bool, throwOnError: bool}
 @module("katex") external renderToString: (string, katexOptions) => string = "renderToString"
 
-let math: View.render = (atom, ~display) =>
-  <span
-    className="math"
-    dangerouslySetInnerHTML={{
-      "__html": renderToString(atom.text, {displayMode: display, throwOnError: false}),
-    }}
-  />
-
-let video: View.render = (atom, ~display as _) =>
-  <span className="video"> {React.string("▶ " ++ atom.text)} </span>
-
-let videoWidget: View.widget = (~atom, ~onChange, ~onClose) =>
-  <textarea
-    className="widget__source"
-    defaultValue=atom.text
-    rows=2
-    onChange={event => onChange(ReactEvent.Form.target(event)["value"])}
-    onKeyDown={event =>
-      if ReactEvent.Keyboard.key(event) == "Escape" {
-        onClose()
+let math = Rule.make({
+  param: Rule.raw,
+  first: atom => atom,
+  render: (atom, ~param as _, ~display) =>
+    <span
+      className="math"
+      dangerouslySetInnerHTML={{
+        "__html": renderToString(atom.text, {displayMode: display, throwOnError: false}),
       }}
-    onBlur={_ => onClose()}
-  />
+    />,
+})
 
-let types: dict<View.spec> = Dict.fromArray([
-  ("math", {View.render: math}),
-  ("video", {render: video, widget: videoWidget}),
-])
+let video = Rule.make({
+  param: Rule.raw,
+  first: atom => atom,
+  render: (atom: Rule.atom, ~param as _, ~display as _) =>
+    <span className="video"> {React.string("▶ " ++ atom.text)} </span>,
+  editor: (atom, ~param as _, ~onChange, ~onClose) =>
+    <textarea
+      className="widget__source"
+      defaultValue=atom.text
+      rows=2
+      onChange={event => onChange({text: ReactEvent.Form.target(event)["value"]})}
+      onKeyDown={event =>
+        if ReactEvent.Keyboard.key(event) == "Escape" {
+          onClose()
+        }}
+      onBlur={_ => onClose()}
+    />,
+})
+
+let rules = Dict.fromArray([("math", math), ("video", video)])
 
 let shown = Tilia.tilia({last: ""})
 
@@ -228,7 +232,7 @@ module Received = {
 // model's harness mints, so a scenario that names ids reads the same here.
 let mint = (state: View.state) =>
   () => {
-    let taken = state.doc.blocks->Array.map(block => block.id)
+    let taken = View.doc(state).blocks->Array.map(block => block.id)
     let rec free = index => {
       let id = Notation.letter(index)
       taken->Array.includes(id) ? free(index + 1) : id
@@ -241,7 +245,7 @@ let mintAtom = (state: View.state) =>
   () => {
     let rec free = n => {
       let id = `e${Int.toString(n)}`
-      state.doc.atoms->Dict.has(id) ? free(n + 1) : id
+      View.doc(state).atoms->Dict.has(id) ? free(n + 1) : id
     }
     free(1)
   }

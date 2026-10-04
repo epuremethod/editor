@@ -6,63 +6,97 @@
 open Editor
 
 type state = {
-  mutable doc: Doc.t,
+  live: Live.t,
   // Bumped for a block whose content changed, so React rebuilds its DOM
   // instead of patching what the browser already touched.
   mutable revisions: dict<int>,
   mutable composing: bool,
-  // The atom whose type's widget is open under its atom, if any. The
-  // box is the model's state; a widget is the view's.
-  mutable widget: option<Doc.id>,
+  // The atom whose rule's editor is open under its atom, if any. The box
+  // is the model's state; an editor is the view's.
+  mutable editor: option<Doc.id>,
 }
 
 // The state of an editor over a section, a tilia tree the view observes.
-let prepare = (section: Section.t): state =>
-  Tilia.tilia({doc: Storage.read(section), revisions: Dict.make(), composing: false, widget: None})
+let prepare = (section: Section.t, ~rules: dict<Rule.t>=Dict.make()): state =>
+  Tilia.tilia({
+    live: Live.make(~row=section, ~doc=Storage.read(section), ~rules),
+    revisions: Dict.make(),
+    composing: false,
+    editor: None,
+  })
+
+let doc = (state: state) => state.live.typed.doc
 
 let bump = (state: state, id: Doc.id) =>
   state.revisions->Dict.set(id, state.revisions->Dict.get(id)->Option.getOr(0) + 1)
 
-// Replaces the document outright, every block rebuilt. For a host that
-// swaps the section, and for a test that loads a scenario.
-let load = (state: state, doc: Doc.t) => {
-  doc.blocks->Array.forEach(block => bump(state, block.id))
-  state.widget = None
-  state.doc = doc
+// Replaces the document outright, every block rebuilt, and makes it the
+// row. For a host that swaps the section, and for a test that loads a
+// scenario.
+let load = (state: state, loaded: Doc.t) => {
+  loaded.blocks->Array.forEach(block => bump(state, block.id))
+  state.editor = None
+  state.live.typed = Typed.make(~row=Storage.write(loaded, ~id=state.live.typed.row.id), ~doc=loaded)
+  Live.sync(state.live)
 }
 
-// How an atom draws, by its type, inline or as a display.
-type render = (Doc.atom, ~display: bool) => React.element
+// The blocks whose content or form an act changed: they are rebuilt. An
+// atom that changed draws again through tilia, and its block stays.
+let rebuild = (state: state, ~before: Doc.t, ~after: Doc.t) =>
+  after.blocks->Array.forEach(block =>
+    switch Doc.block(before, block.id) {
+    | Some(old) if old.content == block.content && old.form == block.form => ()
+    | _ => bump(state, block.id)
+    }
+  )
 
-// A type's own editor, opened by a click on its atom and placed under it
-// by the editor: it takes the atom, a way to change its text, and a way
-// to close.
-type widget = (~atom: Doc.atom, ~onChange: string => unit, ~onClose: unit => unit) => React.element
+// Applies an act through the core: an act that keeps the block list is
+// typed, and any other is saved.
+let act = (state: state, storage: Section.storage, edit: Doc.t => Doc.t) => {
+  let before = doc(state)
+  let typed = Typed.act(state.live.typed, storage, edit)
+  rebuild(state, ~before, ~after=typed.doc)
+  state.live.typed = typed
+  Live.sync(state.live)
+}
 
-// What the host knows about a type. A type with `render` alone enters the
-// editor's box under the arrows and on a click. A type with a widget
-// skips under the arrows and opens its widget on a click. `enter` set to
-// false skips and opens nothing.
-type spec = {render: render, enter?: bool, widget?: widget}
+// Writes the typed text to the port. The host decides when.
+let save = (state: state, storage: Section.storage) => {
+  state.live.typed = Typed.save(state.live.typed, storage)
+}
 
-let plain: render = (atom, ~display as _) =>
-  <span className="source"> {React.string(atom.text)} </span>
+// A row that landed, through the port's merge. Answers the blocks it
+// rebuilt.
+let land = (state: state, storage: Section.storage, remote: Section.t) => {
+  let before = doc(state)
+  let typed = Typed.land(state.live.typed, storage, remote)
+  let rebuilt = typed.doc.blocks->Array.filter(block =>
+    switch Doc.block(before, block.id) {
+    | Some(old) => old.content != block.content || old.form != block.form
+    | None => true
+    }
+  )
+  rebuilt->Array.forEach(block => bump(state, block.id))
+  state.live.typed = typed
+  Live.sync(state.live)
+  rebuilt->Array.map(block => block.id)
+}
 
-// What the host makes of a pasted file: the type and the text of a new
+let typed = (state: state) => Typed.typed(state.live.typed)
+
+// What the host makes of a pasted file: the rule and the text of a new
 // atom, or nothing when it takes no file of that kind.
-type pasted = {type_: string, text: string}
+type pasted = {rule: string, text: string}
 type paste = Browser.file => option<pasted>
 
-// The spec of an atom's type; a type the host did not name shows its
-// source and enters.
-let specOf = (types: dict<spec>, atom: Doc.atom) =>
-  types->Dict.get(atom.type_)->Option.getOr({render: plain})
-
-let entersOf = (types: dict<spec>): Edit.enters =>
-  atom => {
-    let spec = specOf(types, atom)
-    spec.enter->Option.getOr(spec.widget->Option.isNone)
-  }
+// An atom whose rule has no editor enters the box; so does an atom whose
+// rule the host does not give.
+let entersOf = (rules: dict<Rule.t>): Edit.enters =>
+  atom =>
+    switch rules->Dict.get(atom.type_) {
+    | Some(rule) => rule.editor->Option.isNone
+    | None => true
+    }
 
 // Floating UI positions the box under an atom, above it when there is no
 // room, and shifted to stay on screen.
@@ -290,22 +324,28 @@ let wrap = (kind: Doc.kind, inner: React.element) =>
   | Ref(_) => inner
   }
 
-// An atom: the atom a reference names, drawn by its type, and never edited
+// An atom: the atom a reference names, drawn by its rule, and never edited
 // by the browser. `data-atom` holds the reference's characters, so the atom
-// counts as them. A reference to no atom draws as a placeholder. A mouse
-// down opens the box.
+// counts as them. An atom whose rule the host does not give shows its
+// source, and a reference to no atom draws as a placeholder. A mouse down
+// opens the box. The atom observes its own reads, so a new text or param
+// draws it again and leaves its block alone.
 module Atom = {
   @react.component
   let make = (
     ~id: Doc.id,
     ~text: string,
-    ~atom: option<Doc.atom>,
+    ~live: Live.t,
     ~display: bool,
-    ~render: render,
     ~onOpen: Doc.id => unit,
   ) => {
-    let drawn = switch atom {
-    | Some(atom) => render(atom, ~display)
+    TiliaReact.useTilia()
+    let drawn = switch live.atoms->Dict.get(id) {
+    | Some(atom) =>
+      switch (live.rules->Dict.get(atom.rule), live.live->Dict.get(id)) {
+      | (Some(rule), Some(value)) => rule.draw(atom, value, ~display)
+      | _ => <span className="source"> {React.string(atom.text)} </span>
+      }
     | None => <span className="atom__missing"> {React.string(text)} </span>
     }
     // The data attributes are set on the node: JSX types no `data-` prop.
@@ -345,8 +385,7 @@ module Block = {
   @react.component
   let make = (
     ~block: Doc.block,
-    ~atoms: dict<Doc.atom>,
-    ~render: render,
+    ~live: Live.t,
     ~onOpen: Doc.id => unit,
   ) => {
     let pieces = Runs.segments(block.content)
@@ -364,14 +403,7 @@ module Block = {
             )
             let core = switch reference {
             | Some(ref) =>
-              <Atom
-                id=ref
-                text
-                atom={atoms->Dict.get(ref)}
-                display={block.form == Display}
-                render
-                onOpen
-              />
+              <Atom id=ref text live display={block.form == Display} onOpen />
             | None => React.string(text)
             }
             <React.Fragment key={Int.toString(index)}>
@@ -435,64 +467,26 @@ let grouped = (blocks: array<Doc.block>): array<array<Doc.block>> => {
 @react.component
 let make = (
   ~state: state,
-  ~section: Section.t,
   ~storage: Section.storage,
   ~mint: option<unit => string>=?,
   ~mintAtom: option<unit => string>=?,
-  ~types: dict<spec>=Dict.make(),
   ~paste: option<paste>=?,
 ) => {
   TiliaReact.useTilia()
   let own = React.useMemo0(() =>
-    fresh(id => Doc.block(state.doc, id)->Option.isSome || state.doc.atoms->Dict.has(id))
+    fresh(id => Doc.block(doc(state), id)->Option.isSome || doc(state).atoms->Dict.has(id))
   )
   let mint = mint->Option.getOr(own)
   let mintAtom = mintAtom->Option.getOr(own)
   let root = React.useRef(Nullable.null)
-  let enters = entersOf(types)
-  let render: render = (atom, ~display) => specOf(types, atom).render(atom, ~display)
+  let enters = entersOf(state.live.rules)
+  let apply = edit => act(state, storage, edit)
 
-  // Applies an act. A block whose content changed is rebuilt, and so is a
-  // block whose atom's atom changed. The section goes to the host when
-  // any content or atom changed.
-  let apply = (act: Doc.t => Doc.t) => {
-    let before = state.doc
-    let after = act(before)
-    let changedAtoms =
-      after.atoms
-      ->Dict.toArray
-      ->Array.filterMap(((id, atom)) => before.atoms->Dict.get(id) == Some(atom) ? None : Some(id))
-    let changed = after.blocks->Array.filter(block =>
-      switch Doc.block(before, block.id) {
-      | Some(old) =>
-        old.content != block.content ||
-        old.form != block.form ||
-        block.content.marks->Array.some(mark =>
-          switch mark.kind {
-          | Ref(id) => changedAtoms->Array.includes(id)
-          | _ => false
-          }
-        )
-      | None => true
-      }
-    )
-    changed->Array.forEach(block => bump(state, block.id))
-    state.doc = after
-    if (
-      changed->Array.length > 0 ||
-      after.blocks->Array.length != before.blocks->Array.length ||
-      after.atoms != before.atoms
-    ) {
-      storage.update([Storage.write(after, ~id=section.id)])
-    }
-  }
-
-  // A click on an atom: the caret lands after the atom, and then the type
-  // decides. A type that enters opens the box at the end of the source; a
-  // type with a widget opens the widget; a type that neither enters nor
-  // has a widget opens nothing.
+  // A click on an atom: the caret lands after the atom, and then the rule
+  // decides. A rule with an editor opens it; any other atom opens the box
+  // at the end of its source.
   let open_ = (id: Doc.id) => {
-    state.doc.blocks->Array.forEach(block =>
+    doc(state).blocks->Array.forEach(block =>
       block.content.marks->Array.forEach(mark =>
         if mark.kind == Ref(id) {
           let point = {Doc.block: block.id, offset: mark.stop}
@@ -500,14 +494,9 @@ let make = (
         }
       )
     )
-    switch state.doc.atoms->Dict.get(id) {
-    | Some(atom) =>
-      let spec = specOf(types, atom)
-      if spec.widget->Option.isSome {
-        state.widget = Some(id)
-      } else if enters(atom) {
-        apply(doc => Edit.enter(doc, ~id))
-      }
+    switch doc(state).atoms->Dict.get(id) {
+    | Some(atom) if enters(atom) => apply(doc => Edit.enter(doc, ~id))
+    | Some(_) => state.editor = Some(id)
     | None => ()
     }
   }
@@ -518,7 +507,7 @@ let make = (
     root.current
     ->Nullable.toOption
     ->Option.forEach(root => {
-      switch (state.doc.selection, Browser.selected()->Nullable.toOption) {
+      switch (doc(state).selection, Browser.selected()->Nullable.toOption) {
       | (Some(model), Some(selection)) => place(root, model, selection)
       | _ => ()
       }
@@ -528,7 +517,7 @@ let make = (
   // Leaves the box by an act and gives the editor back its caret.
   let leaveBy = (act: Doc.t => Doc.t) => {
     apply(act)
-    if state.doc.editing == None {
+    if doc(state).editing == None {
       focusRoot()
     }
   }
@@ -561,7 +550,7 @@ let make = (
     ->Nullable.toOption
     ->Option.flatMap(selected)
     ->Option.forEach(((anchor, focus)) =>
-      if !same(Some((anchor, focus)), state.doc.selection) {
+      if !same(Some((anchor, focus)), doc(state).selection) {
         apply(doc => Edit.select(doc, ~anchor, ~focus))
       }
     )
@@ -573,12 +562,12 @@ let make = (
     switch (paste, event->Browser.clipboard->Nullable.toOption) {
     | (Some(paste), Some(transfer)) =>
       switch transfer->Browser.files->Array.findMap(paste) {
-      | Some({type_, text}) =>
+      | Some({rule, text}) =>
         Browser.prevent(event)
         sync()
         let atom = mintAtom()
         let block = mint()
-        apply(doc => Edit.embed(doc, ~atom, ~block, ~type_, ~text))
+        apply(doc => Edit.embed(doc, ~atom, ~block, ~type_=rule, ~text))
       | None => ()
       }
     | _ => ()
@@ -586,7 +575,7 @@ let make = (
 
   let onBeforeInput = (event: Browser.event) => {
     sync()
-    let doc = state.doc
+    let doc = doc(state)
     let prevent = () => event->Browser.prevent
     switch event->Browser.inputType {
     | "insertParagraph" =>
@@ -669,10 +658,10 @@ let make = (
       !(event->ReactEvent.Keyboard.ctrlKey)
     let command = event->ReactEvent.Keyboard.metaKey || event->ReactEvent.Keyboard.ctrlKey
     switch event->ReactEvent.Keyboard.key {
-    | "ArrowRight" if plain && !across(state.doc) =>
+    | "ArrowRight" if plain && !across(doc(state)) =>
       event->ReactEvent.Keyboard.preventDefault
       apply(doc => Edit.right(doc, ~enters))
-    | "ArrowLeft" if plain && !across(state.doc) =>
+    | "ArrowLeft" if plain && !across(doc(state)) =>
       event->ReactEvent.Keyboard.preventDefault
       apply(doc => Edit.left(doc, ~enters))
     | "b" if command =>
@@ -732,7 +721,7 @@ let make = (
         | Some(root) if !state.composing =>
           let now = selected(root)
           switch now {
-          | Some((anchor, focus)) if !same(now, state.doc.selection) =>
+          | Some((anchor, focus)) if !same(now, doc(state).selection) =>
             apply(doc => Edit.select(doc, ~anchor, ~focus))
           | _ => ()
           }
@@ -755,7 +744,7 @@ let make = (
   React.useLayoutEffectOnEveryRender(() => {
     switch (
       root.current->Nullable.toOption,
-      state.doc.selection,
+      doc(state).selection,
       Browser.selected()->Nullable.toOption,
     ) {
     | (Some(root), Some(model), Some(selection))
@@ -777,9 +766,9 @@ let make = (
       ->Nullable.toOption
       ->Option.flatMap(root => root->Browser.query(`[data-ref="${id}"]`)->Nullable.toOption)
 
-  let box = switch state.doc.editing {
+  let box = switch doc(state).editing {
   | Some({atom: id, offset}) =>
-    switch state.doc.atoms->Dict.get(id) {
+    switch doc(state).atoms->Dict.get(id) {
     | Some(atom) =>
       <Floater key=id anchor={anchorOf(id)} className="box">
         <Box
@@ -801,7 +790,7 @@ let make = (
             }}
           onBlur={() =>
             // The focus went elsewhere: the box closes and the caret stays.
-            if state.doc.editing != None {
+            if doc(state).editing != None {
               apply(doc => {...doc, editing: None})
             }}
         />
@@ -811,23 +800,33 @@ let make = (
   | None => React.null
   }
 
-  let widget = switch state.widget {
+  let editor = switch state.editor {
   | Some(id) =>
-    switch state.doc.atoms
-    ->Dict.get(id)
-    ->Option.flatMap(atom => specOf(types, atom).widget->Option.map(widget => (atom, widget))) {
-    | Some((atom, widget)) =>
+    switch (
+      state.live.atoms->Dict.get(id),
+      state.live.atoms
+      ->Dict.get(id)
+      ->Option.flatMap(atom => state.live.rules->Dict.get(atom.rule))
+      ->Option.flatMap(rule => rule.editor),
+      state.live.live->Dict.get(id),
+    ) {
+    | (Some(atom), Some(editor), Some(value)) =>
       <Floater key=id anchor={anchorOf(id)} className="widget">
-        {widget(
-          ~atom,
-          ~onChange=text => apply(doc => Edit.edit(doc, ~id, ~text)),
+        {editor(
+          atom,
+          value,
+          ~onChange=change =>
+            apply(doc => {
+              let doc = change.text->Option.mapOr(doc, text => Edit.edit(doc, ~id, ~text))
+              change.param->Option.mapOr(doc, param => Edit.place(doc, ~id, ~param))
+            }),
           ~onClose=() => {
-            state.widget = None
+            state.editor = None
             focusRoot()
           },
         )}
       </Floater>
-    | None => React.null
+    | _ => React.null
     }
   | None => React.null
   }
@@ -851,7 +850,7 @@ let make = (
         readBack()
       }}
     >
-      {grouped(state.doc.blocks)
+      {grouped(doc(state).blocks)
       ->Array.map(group => {
         let drawn =
           group
@@ -861,8 +860,7 @@ let make = (
               ":" ++
               Int.toString(state.revisions->Dict.get(block.id)->Option.getOr(0))}
               block
-              atoms=state.doc.atoms
-              render
+              live=state.live
               onOpen=open_
             />
           )
@@ -874,6 +872,6 @@ let make = (
       ->React.array}
     </div>
     {box}
-    {widget}
+    {editor}
   </>
 }

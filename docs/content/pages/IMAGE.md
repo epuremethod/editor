@@ -135,28 +135,29 @@ has nothing left to add, and `storage/binding` drops it.
 
 ## One rule per type
 
-An image draws the way a formula draws. The host hands the view one rule
-for each type of atom. A rule holds a codec for the param, a first value,
-one loader and two widgets:
+An image draws the way a formula draws. The host hands the view its rules
+by name, and an atom names its rule on the first line of its text. A rule
+holds a codec for the param, a first value, an optional loader, a renderer
+and an optional editor:
 
 ```
 rule<'a, 'p>:
-  param:    dict<string> <=> 'p                               decodes and encodes the placement
-  first:    text => 'a                                        the live atom before the loader sets
-  loader:   (text, set) => unit                               sets the live atom, now and on each change
-  renderer: ('a, ~param, ~display) => React.element           draws the atom, inline or as a display
-  editor:   ('a, ~param, ~onChange, ~onClose) => React.element opens under the atom on a click
+  param:   dict<string> <=> 'p                                 decodes and encodes the placement
+  first:   atom => 'a                                          the live atom before the loader sets
+  loader:  (atom, 'a, set) => unit                             sets the live atom, with the previous one
+  render:  ('a, ~param, ~display) => React.element             draws the atom, inline or as a display
+  editor:  ('a, ~param, ~onChange, ~onClose) => React.element  opens under the atom on a click
 ```
 
-The loader reads the text alone. The renderer and the editor also read the
-decoded param.
+The loader reads the atom's text, and never its param. The renderer and
+the editor read the decoded param.
 
 `'a` is the live atom, the app's model of the atom. Each rule has its own,
 and only the rule knows what it is. The view hands the live atom to the
 renderer, and to the editor when a click opens it. To `@tilia/editor`,
 these are plain calls. It never waits, and it never reads a loading state.
 
-`editor` replaces today's `widget`. It is optional: a rule without one
+`editor` is optional: a rule without one
 enters the editor's box. Its two callbacks are:
 
 ```
@@ -173,61 +174,44 @@ returns.
 
 | Rule | `'a` | first | loader | renderer | editor |
 | --- | --- | --- | --- | --- | --- |
-| `math` | `string` | the text | `(text, set) => set(text)` | KaTeX, inline or in display mode | none: it enters the box |
+| `math` | the atom | the atom | none | KaTeX, inline or in display mode | none: it enters the box |
 | `image` | the image model | `Loading(text)` | `image` from `storage/binding` | a placeholder, then the image, sized by the param | the title and the description, the width and the rotation |
 
-### The editor builds the source
+### The editor holds stable objects
 
-`@tilia/editor` carves one object for each section. For now, it holds the
-section's row, typed over the saved one, and its live atoms. The row
-stores its atoms as a list, which is the storage's shape. The live atoms
-are a dict by atom id, which is the shape that stays stable for tilia.
+The core is a value: every act returns a new document, and its atoms are
+new records. `@tilia/editor` holds the section in `Live`: the core's row
+and document, one tilia object for each atom id, and one live atom for
+each.
 
-Three layers map the list to the dict. Each one tracks its own reads:
+After every act, save and landing, `Live.sync` writes the new document
+into the same objects:
 
-```
-let section = row => {
-  let atoms_ = derived(() => row.atoms)
-  let held = Set.make()
-  let live = tilia(dict{})
-  let live_ = derived(() => {
-    let atoms = atoms_.value
-    held->forEach(id => if !(atoms->has(id)) {
-      held->Set.delete(id)
-      live->Dict.delete(id)
-    })
-    atoms->forEach(atom => if !(held->Set.has(atom.id)) {
-      held->Set.add(atom.id)
-      live[atom.id] = source(rule.first(atom.text), (_, set) =>
-        rule.loader(atom.text, set))
-    })
-    live
-  })
-  carve(({derived}) => {
-    row,
-    atoms: lift(live_),
-  })
-}
-```
+- An atom keeps its object while its id stays in the section. A new text
+  is written into it. Its param object is merged key by key: a changed
+  value is set, a missing key is deleted, and an equal value is not
+  written.
+- A new id gets an atom object and a live atom. For a rule with a loader,
+  the live atom is a tilia `source` whose setup is the loader:
+  `source(first(atom), (previous, set) => loader(atom, previous, set))`.
+  For a rule without one, it is `first(atom)`.
+- An id that leaves the section loses its atom and its live atom.
 
-- `atoms_` reads the row's list, and only the list. A new text or a new
-  param in an entry does not touch it.
-- `live_` runs when the list changes. It removes the live atoms whose ids
-  left the list, and it adds a source for each new id. It keeps every
-  other live atom as it is, and it returns the same dict. A dropped entry
-  removes its key. The dict and every live atom that stays are stable.
-- Each source's setup reads only its atom's text. When that text changes,
-  tilia runs the setup again, and the loader loads the new record. A new
-  text names another record, so the loader starts it again at `Loading`.
+So a change reaches only what reads the part that changed. A resize
+writes a key of the param: the renderer draws again, and no loader runs.
+A new text runs the loader again, since it read the text, and the loader
+receives the previous live atom. An image loader keeps the old image on
+screen until the new one is ready, so a replaced image does not blink,
+and a renderer can animate the change with CSS. The loader also reads the
+record and its bytes from the binding, so tilia runs it again when they
+change.
 
-A change of param runs none of the three layers. The image keeps its live
-atom, and only the renderer draws again. `live_` reads `held` and never
-reads `live`, so building the dict never observes it. An entry keeps its
-object while its id stays in the list, so a source keeps reading the right
-text.
+`math` needs no loader: its live atom is the atom object, so a new formula
+changes its text in place.
 
-The first value rarely shows. When the storage holds the record and the
-bytes on the device, the loader calls `set` at once, in the same tick.
+A loader runs when its live atom is first read, which is when it is first
+drawn. The first value rarely shows. When the storage holds the record and
+the bytes on the device, the loader calls `set` at once, in the same tick.
 
 ## Loading an image
 

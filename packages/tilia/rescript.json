@@ -4,13 +4,17 @@
   "sources": [
     {
       "dir": "src/view",
-      "public": ["View"],
+      "public": ["View", "Rule", "Image", "Live"],
       "subdirs": [
         {
           "dir": "app",
           "type": "dev"
         }
       ]
+    },
+    {
+      "dir": "src/design",
+      "type": "dev"
     }
   ],
   "package-specs": {
@@ -21,5 +25,6 @@
   "jsx": {
     "version": 4
   },
-  "dependencies": ["@epure/editor", "tilia", "@tilia/react", "@rescript/react"]
+  "dependencies": ["@epure/editor", "tilia", "@tilia/react", "@rescript/react"],
+  "dev-dependencies": ["@epure/vitest"]
 }

@@ -4,7 +4,7 @@
 open Editor
 open Course
 
-let state = View.prepare(section)
+let state = View.prepare(section, ~rules)
 let mint = mint(state)
 let mintAtom = mintAtom(state)
 let collaborator = Collaborator.make(section)
@@ -40,9 +40,9 @@ window->expose({
         editing: editing->Nullable.toOption,
       },
     ),
-  notation: labels => Notation.write(state.doc, ~labels),
-  atoms: () => state.doc.atoms,
-  editing: () => state.doc.editing->Nullable.fromOption,
+  notation: labels => Notation.write(View.doc(state), ~labels),
+  atoms: () => View.doc(state).atoms,
+  editing: () => View.doc(state).editing->Nullable.fromOption,
 })
 
 module App = {
@@ -50,7 +50,7 @@ module App = {
   let make = () =>
     <main>
       <h1> {React.string("open sets")} </h1>
-      <View state section storage mint mintAtom types />
+      <View state storage mint mintAtom />
       <Collaborator.Toggle sim=collaborator state storage />
       <p className="label"> {React.string("what the port received")} </p>
       <pre className="port" id="port">

@@ -448,10 +448,13 @@ browser.
 own once its shape has settled. It renders one section, headings and lists
 included, splits input by type between the browser and the model, rebuilds
 the block the browser touched, keeps the model's selection level with the
-DOM's, draws each atom through a type the host injects, hands a pasted
-file to the host and embeds the atom it returns, and hands the
-changed section to the port after every act; it does not call the core's
-save or landing yet. The Demo page of this site is that editor over the
+DOM's, draws each atom through the rule the host gives for it, and hands
+a pasted file to the host and embeds the atom it returns. It holds each
+atom as one tilia object, written in place, and a live atom that the
+rule's loader sets through a tilia source. It acts through the core's
+typed text: an act that keeps the block list waits for the host's save,
+and a landed row goes through the core's landing. Twenty-six scenarios of
+its own pass in jsdom. The Demo page of this site is that editor over the
 page itself, with what the port received under it and a simulated
 collaborator whose rows land through the core. A hundred and eighteen of
 the cards run in Chrome through the same fixtures; seventeen are skipped
@@ -475,8 +478,8 @@ keyed array's sequence merge are still to write there.
 | Copy and paste | paste from plain text; copy and HTML to come |
 | Undo | not started |
 | Block forms: headings and items | done |
-| Formulas and embeds | formulas done; the param, `embed` and `place` done; image rows not bound |
-| Typed text and a landed row | done in the core; the view to move onto it |
+| Formulas and embeds | formulas done; the param, `embed` and `place` done; rules and live atoms done; image rows not bound |
+| Typed text and a landed row | done in the core and the view |
 | Radif: text diff3, the sequence merge, rows through the port | not started |
 
 ## Order of work

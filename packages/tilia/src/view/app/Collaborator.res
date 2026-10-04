@@ -215,21 +215,15 @@ let aimed = (sim: t, doc: Doc.t): (Section.t, string) =>
 // changed is rebuilt. The host then saves, and the collaborator receives
 // the save, so its next change starts from the section as shown.
 let land = (sim: t, state: View.state, storage: Section.storage, remote: Section.t) => {
-  let next = Typed.land(Typed.make(~row=sim.row, ~doc=state.doc), storage, remote)
-  next.doc.blocks->Array.forEach(block =>
-    switch Doc.block(state.doc, block.id) {
-    | Some(old) if old.content == block.content && old.form == block.form => ()
-    | _ => View.bump(state, block.id)
-    }
-  )
-  state.doc = next.doc
-  sim.row = Storage.write(state.doc, ~id=sim.row.id)
+  ignore(View.land(state, storage, remote))
+  View.save(state, storage)
+  sim.row = state.live.typed.row
 }
 
 let tick = (sim: t, state: View.state, storage: Section.storage) => {
   sim.ticks = sim.ticks + 1
   let (remote, last) = switch Math.Int.random(0, 3) {
-  | _ if mod(sim.ticks, 2) == 0 => aimed(sim, state.doc)
+  | _ if mod(sim.ticks, 2) == 0 => aimed(sim, View.doc(state))
   | 0 => add(sim)
   | 1 => insert(sim)
   | _ => join(sim)
@@ -239,7 +233,7 @@ let tick = (sim: t, state: View.state, storage: Section.storage) => {
 }
 
 let start = (sim: t, state: View.state, storage: Section.storage) => {
-  sim.row = Storage.write(state.doc, ~id=sim.row.id)
+  sim.row = Storage.write(View.doc(state), ~id=sim.row.id)
   sim.timer = Some(setInterval(() => tick(sim, state, storage), 5_000))
   sim.on = true
 }

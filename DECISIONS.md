@@ -204,3 +204,46 @@ instead of becoming one.
 
 Costs the caller two ids, and the browser suite skips the card: no key
 puts a file on the clipboard.
+
+## 2026-10-04 — The view holds each atom as one stable object
+
+`Live.sync` writes every new document into the same tilia objects: one
+for each atom id, with its rule, its text and its param. The param object
+is merged key by key. A resize then reaches only the renderer, and a
+replaced image can change in place with a CSS transition.
+
+Refused: new atom objects from each document. Every act would draw every
+atom again, and a renderer could not tell a moved image from a new one.
+Refused: live state in a React hook. A rebuilt block remounts its atoms,
+and the state would be lost.
+
+Costs a merge after every act, and identity that holds only for what the
+view writes. Tilia hands out a new wrapper for a live value whose observer
+left and came back, so an image's live state is equal, not identical,
+after its atom draws again.
+
+## 2026-10-04 — A loader is the setup of a tilia source
+
+A rule's live atom is `source(first(atom), (previous, set) =>
+loader(atom, previous, set))`. Tilia runs the loader again when a value it
+read changes: the atom's text, or the record and the bytes it reads from
+the binding. It receives the previous live atom, so an image keeps the old
+one on screen until the new one is ready.
+
+Refused: one loader call for each id, with the loader's own `observe` on
+the text. Each loader would track its own reads and return a stop for the
+editor to keep. Refused: a loader that takes the text alone. It could not
+keep the previous image, and a new text would blink.
+
+Costs a loader that answers late a check that the text it started from is
+still the atom's text.
+
+## 2026-10-04 — An atom names its rule
+
+The host hands the view a dict of rules, and an atom names its rule on
+the first line of its text. A rule decodes the param, gives a first value,
+loads, draws and, optionally, edits. A rule without an editor enters the
+box. The core's `type_` keeps its name for now.
+
+Refused: `spec` with `render`, `enter` and `widget`. Three ways to say what
+a click does, and no place for a loader or a param.

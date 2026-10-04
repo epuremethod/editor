@@ -3,14 +3,14 @@
 
 open Course
 
-let state = View.prepare(section)
+let state = View.prepare(section, ~rules)
 let mint = mint(state)
 let mintAtom = mintAtom(state)
 let collaborator = Collaborator.make(section)
 
 ReactDOM.querySelector("#demo-editor")->Option.forEach(root =>
   ReactDOM.Client.createRoot(root)->ReactDOM.Client.Root.render(
-    <View state section storage mint mintAtom types />,
+    <View state storage mint mintAtom />,
   )
 )
 
