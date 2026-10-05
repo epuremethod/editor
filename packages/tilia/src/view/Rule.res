@@ -20,6 +20,9 @@ type rule<'a, 'p> = {
   loader?: (atom, 'a, 'a => unit) => unit,
   render: ('a, ~param: 'p, ~display: bool) => React.element,
   editor?: ('a, ~param: 'p, ~onChange: change => unit, ~onClose: unit => unit) => React.element,
+  // Called when the atom's id leaves the section, to release what the
+  // rule holds for it.
+  leave?: atom => unit,
 }
 
 // A rule with its live atom and its param erased, so that one dict holds
@@ -31,6 +34,7 @@ type t = {
   editor: option<
     (atom, unknown, ~onChange: change => unit, ~onClose: unit => unit) => React.element,
   >,
+  leave: option<atom => unit>,
 }
 
 let make = (rule: rule<'a, 'p>): t => {
@@ -44,6 +48,7 @@ let make = (rule: rule<'a, 'p>): t => {
     (atom: atom, live, ~onChange, ~onClose) =>
       editor(Obj.magic(live), ~param=rule.param.decode(atom.param), ~onChange, ~onClose)
   ),
+  leave: rule.leave,
 }
 
 // The param as it is, for a rule that reads it whole.

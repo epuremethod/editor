@@ -4,7 +4,7 @@
   "sources": [
     {
       "dir": "src/view",
-      "public": ["View", "Rule", "Image", "Live"],
+      "public": ["View", "Rule", "Image", "Live", "Browser"],
       "subdirs": [
         {
           "dir": "app",

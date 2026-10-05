@@ -47,5 +47,6 @@
     "tilia",
     "@tilia/react",
     "@rescript/react"
-  ]
+  ],
+  "dev-dependencies": ["@epure/vitest"]
 }

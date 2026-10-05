@@ -226,25 +226,29 @@ app | draws each state
 ```
 
 A draw reads the source, so it runs again each time the loader sets. The
-editor does not see the change. The image model belongs to `app`, or to a
-query library over tilia:
+editor does not see the change. The image model is `Image.t` in
+`@tilia/editor`:
 
 ```
 image:
-  Loading(id)                                                the record has not arrived
-  Missing(id)                                                no such record, or the reader cannot reach it
-  Downloading({width, height, title, description, percent})  the bytes arrive
-  Uploading({width, height, title, description, src, percent})  the pasted blob shows while it travels
-  Ready({width, height, title, description, src})            the storage holds the bytes, and the device has them
+  Loading({record, meta?, blob?})   the row or its bytes are on their way
+  Missing(record)                   no such row, or the reader cannot reach it
+  Ready({meta, src})                the bytes are on the device
+meta: {record, object, width, height, title, description}
 ```
 
-- `Loading` draws a placeholder of one line.
-- `Missing` draws a placeholder that says the image is not available.
-- `Downloading` draws a placeholder of the image's width and height, with
-  the progress.
-- `Uploading` and `Ready` draw the image, with the description as its text
-  for a reader who cannot see it. `Uploading` shows a bar.
-- With no description, the image shows that it lacks one.
+- While it loads, an image draws the blob when the device holds it, a
+  placeholder of its width and height when the row has arrived, and a
+  placeholder of one line otherwise.
+- `Missing` says that the image is not available.
+- `Ready` draws the image, with the description as its text for a reader
+  who cannot see it.
+
+A row that does not answer may still be on its way: a client cannot tell
+a row it has not pulled from a row that does not exist. So the radif
+loader sets `Missing` only once the client is in step and no pull has
+brought anything for 500 milliseconds. Offline, the image stays a
+placeholder.
 
 A click on an image opens the rule's editor. It writes the title and the
 description to the record, and the new values come back through the
@@ -267,12 +271,13 @@ before the push that names it, and the push carries the value only.
 storage/binding | makes an image record, keeps the blob under its id, and returns an atom
 @epure/editor | puts the atom in a display block, and the section is saved
 @tilia/editor | builds a source for the atom, as for a stored image
-storage/binding | finds the blob on the device and sets Uploading, with the blob as its src
-app | draws the image, and shows the upload
+storage/binding | sets Loading with the blob at once, then Ready once its bytes open
+app | draws the blob from the first draw
 ```
 
 - `paste(file)` makes the record and returns the atom at once. The editor
-  never waits for the bytes or the save.
+  never waits for the bytes or the save. The size and the bytes come
+  after, and one upsert writes the row.
 - `@epure/editor` gains one edit, `embed`. It puts an atom in a new display
   block after the block that holds the caret. An empty paragraph becomes the
   display block itself. `embed` knows no image and serves any embed: an
@@ -280,16 +285,18 @@ app | draws the image, and shows the upload
 
 ### The upload
 
-The upload is the `Uploading` state of the model. The editor does not see
-it. Its `src` is the blob, so the image shows before any byte has left the
-device. At `Ready`, `storage/binding` swaps the blob for the stored URL and
-drops it.
+The editor does not see the upload. The pasted blob is the image's `src`
+from the first draw, so the image shows before any byte has left the
+device. It stays the `src` once the bytes are stored: radif keeps every
+object under a customer key, so a read sends the key in its headers, and
+an image read back would be an in-memory blob of the same bytes. Radif
+drops its own kept copy when the push that names it lands. The binding
+releases the pasted blob when the image leaves the section.
 
-A bar shows the upload until the image is `Ready`. A refused save starts
-the upload again, back at 0. With radif, the client mints a new object key,
-rewrites the record, and uploads again under that key. An offline device stays at 0 until it is back
-online. Nothing here is an error. An image is local first, like the text
-around it.
+A refused save starts the upload again. With radif, the client mints a new
+object key, rewrites the record, and uploads again under that key. An
+offline device uploads once it is back online. Nothing here is an error.
+An image is local first, like the text around it.
 
 ### The description is required
 
@@ -310,9 +317,11 @@ reader can watch the image travel. It stores nothing.
 
 ## What `storage/binding` offers
 
-- `image(text, set)`: sets the image that `text` names, and sets it again
-  whenever the record or its bytes change. It is the loader of the `image`
-  rule.
+- `loader(atom, previous, set)`: sets the image that the atom's text
+  names, and runs again whenever the row or its bytes change. It is the
+  loader of the `image` rule.
+- `leave(atom)`: releases the pasted blob of an image that left the
+  section.
 - `describe(text, ~title, ~description)`: writes the title and the
   description to the record. The rule's editor calls it.
 - `paste(file)`: makes an image record from a file and returns its atom at
@@ -327,8 +336,8 @@ Radif already gives the binding what it stands on:
   lands, and `client.open_`, which reads the kept blob or the stored bytes;
 - a draft, which holds the bytes before the description is written.
 
-Radif does not report how far an upload or a download has gone yet. The
-`percent` of the model needs it.
+Radif does not report how far an upload or a download has gone yet. A
+progress bar waits for it.
 
 ## Not yet
 

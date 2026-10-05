@@ -79,13 +79,15 @@ let int = text =>
   | None => panic(`${text} is not a number`)
   }
 
+let sized = (meta: Image.meta) =>
+  `${meta.record}, ${Int.toString(meta.width)} × ${Int.toString(meta.height)}`
+
 let shown = (image: Image.t) =>
   switch image {
-  | Loading(id) => `Loading(${id})`
+  | Loading({meta: Some(meta)}) => `Loading(${sized(meta)})`
+  | Loading({record}) => `Loading(${record})`
   | Missing(id) => `Missing(${id})`
-  | Downloading(meta) => `Downloading(${meta.record}, ${Int.toString(meta.width)} × ${Int.toString(meta.height)})`
-  | Uploading(meta, _) => `Uploading(${meta.record}, ${Int.toString(meta.width)} × ${Int.toString(meta.height)})`
-  | Ready(meta, _) => `Ready(${meta.record}, ${Int.toString(meta.width)} × ${Int.toString(meta.height)})`
+  | Ready({meta}) => `Ready(${sized(meta)})`
   }
 
 let math: Rule.t = Rule.make({
@@ -112,14 +114,15 @@ given1("a section", (on, table: array<array<string>>) => {
     | Some(found) =>
       let meta: Image.meta = {
         record: text,
+        object: text,
         width: found.width,
         height: found.height,
         title: found.title,
         description: found.description,
       }
       switch found.bytes {
-      | "device" => set(Ready(meta, "blob:" ++ text))
-      | "remote" => set(Downloading(meta))
+      | "device" => set(Ready({meta, src: "blob:" ++ text}))
+      | "remote" => set(Loading({record: text, meta: Some(meta), blob: None}))
       | _ => ()
       }
     }

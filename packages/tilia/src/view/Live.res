@@ -48,6 +48,14 @@ let sync = (live: t) =>
     ->Dict.keysToArray
     ->Array.forEach(id =>
       if !(atoms->Dict.has(id)) {
+        live.atoms
+        ->Dict.get(id)
+        ->Option.forEach(held =>
+          live.rules
+          ->Dict.get(held.rule)
+          ->Option.flatMap(rule => rule.leave)
+          ->Option.forEach(leave => leave(held))
+        )
         live.atoms->Dict.delete(id)
         live.live->Dict.delete(id)
       }

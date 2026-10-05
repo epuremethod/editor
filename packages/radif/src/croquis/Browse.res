@@ -203,13 +203,14 @@ let make = (~actor, ~binding) => {
   })
 }
 
-// An id as two short groups of its base64: characters 8 and 9 are the
-// minute at sixteen minute steps, so rows minted in one sitting read as
-// one moment, and 12 to 15 are three random bytes, which tell rows apart.
+// An id as two short groups of its base64, in the URL alphabet so that no
+// slash reads as a path: characters 8 and 9 are the minute at sixteen
+// minute steps, so rows minted in one sitting read as one moment, and 12 to
+// 15 are three random bytes, which tell rows apart.
 // The tenant comes first only where it is not the Account's own.
 @val external btoa: string => string = "btoa"
 let tag = (self: t, id: Radif.id) => {
-  let text = btoa(id)
+  let text = btoa(id)->String.replaceAll("+", "-")->String.replaceAll("/", "_")
   let tenant =
     Radif.tenant(id) == Radif.tenant(self.actor)
       ? ""
@@ -281,7 +282,6 @@ module View = {
           <li key=row.node.id onClick={_ => descend(browse, row)}>
             <Drawn layers=row.node.icon size=16 />
             <span className="title"> {React.string(row.node.title)} </span>
-            <span className="sep"> {React.string("/")} </span>
             <span className="id"> {React.string(tag(browse, row.node.id))} </span>
             <span className="level" title={Radif.Access.name(row.level)}>
               <Drawn layers={levelIcon(row.level)} size=16 />
@@ -309,8 +309,8 @@ let style = `
   .rows li { display: flex; align-items: center; gap: 0.5rem; padding: 0.3rem 0.3rem; border-radius: 2px; cursor: pointer; }
   .rows li:hover { background: var(--faint); }
   .rows .title { color: var(--black); }
-  .rows .id { font-family: "IBM Plex Mono", monospace; font-size: 0.8em; }
-  .rows .level { display: inline-flex; margin-left: auto; color: var(--black); }
+  .rows .id { margin-left: auto; font-family: "IBM Plex Mono", monospace; font-size: 0.8em; }
+  .rows .level { display: inline-flex; color: var(--black); }
   .rows .empty { color: var(--grey); cursor: default; }
   .rows .empty:hover { background: none; }
 `

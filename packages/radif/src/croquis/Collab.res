@@ -128,10 +128,17 @@ let opened = (client: Client.t, standing: standing) => {
   )
 }
 
-// The sections attached to a document, in their position under it.
+// The sections attached to a document, in their position under it. The
+// back-query along `attached.parents` answers no section today, so the
+// sections are read under the document, where the croquis makes them, and
+// kept when they are attached to it.
 let sections = (binding: RadifTilia.t, ~document: Radif.id) =>
-  switch binding.load(RadifStore.Section.all->from(RadifStore.Attached.parents)->at(document)) {
+  switch binding.load(Radif.under(RadifStore.Section.klass)(document)) {
   | Loaded({claim, data}) =>
+    let data =
+      data->Array.filter(section =>
+        section.attached.parents->Array.some(parent => parent.id == document)
+      )
     let position = (section: RadifStore.Section.t) =>
       section.attached.parents
       ->Array.find(parent => parent.id == document)
@@ -184,7 +191,20 @@ let math = TiliaEditor.Rule.make({
     />,
 })
 
-let rules = Dict.fromArray([("math", math)])
+// The size a pasted file decodes to.
+type bitmap = {width: int, height: int}
+@val external createImageBitmap: TiliaEditor.Browser.file => promise<bitmap> = "createImageBitmap"
+let measure = async file => {
+  let {width, height} = await createImageBitmap(file)
+  (width, height)
+}
+
+// The formula, and the image over the document's binding.
+let rules = (images: Images.t) =>
+  Dict.fromArray([
+    ("math", math),
+    ("image", TiliaEditor.Rule.make(TiliaEditor.Image.rule(~loader=images.loader, ~leave=images.leave))),
+  ])
 
 // ── the page ────────────────────────────────────────────────────────────
 
@@ -197,6 +217,8 @@ type opened = {
   standing: standing,
   /** The document the section is attached to: what the founder shares. */
   document: RadifStore.Document.t,
+  /** Images pasted into the document, and the loader of every image. */
+  images: Images.t,
   state: TiliaEditor.View.state,
   /** The other members, read by the founder alone. */
   others: array<other>,
@@ -237,16 +259,31 @@ let atMost = 1_000
 
 // A block or an atom changed here since the last write keeps the local
 // one: what arrived is older than what the person typed, and the next write
-// carries it. Anything else takes what arrived.
+// carries it. Anything else takes what arrived. One made here and not yet
+// written, such as the atom of a paste into an empty paragraph, stays after
+// the one it follows here.
 let merge = (~base: Section.t, ~local: Section.t, ~remote: Section.t): Section.t => {
   let keep = (base, local, remote, ~key) => {
     let find = (entries, id) => entries->Array.find(entry => key(entry) == id)
-    remote->Array.map(entry =>
+    let merged = remote->Array.map(entry =>
       switch (find(base, key(entry)), find(local, key(entry))) {
       | (Some(was), Some(here)) if was != here => here
       | _ => entry
       }
     )
+    local->Array.forEachWithIndex((entry, index) =>
+      if find(base, key(entry)) == None && find(remote, key(entry)) == None {
+        let before = local->Array.slice(~start=0, ~end=index)->Array.findLast(previous =>
+          find(merged, key(previous)) != None
+        )
+        let at = switch before {
+        | Some(previous) => merged->Array.findIndex(other => key(other) == key(previous)) + 1
+        | None => 0
+        }
+        merged->Array.splice(~start=at, ~remove=0, ~insert=[entry])
+      }
+    )
+    merged
   }
   {
     id: remote.id,
@@ -305,11 +342,13 @@ let editing = (
   document: RadifStore.Document.t,
   first: RadifStore.Section.t,
 ) => {
+  let images = Images.make(~client, ~binding, ~document=document.entity.id, ~measure)
   let self = Tilia.tilia({
     client,
     standing,
     document,
-    state: TiliaEditor.View.prepare(port(first), ~rules),
+    images,
+    state: TiliaEditor.View.prepare(port(first), ~rules=rules(images)),
     others: Tilia.computed(() =>
       standing.founder ? others(binding, standing, ~document=document.entity.id) : []
     ),
@@ -438,10 +477,18 @@ type held = {
 
 @val external later: (unit => unit, int) => unit = "setTimeout"
 
+// The page is the one exposed port. `radif dev` names its bucket by its own
+// address, which the browser cannot reach from another origin, so an
+// object's address goes through the page's proxy, as the wire does. The
+// bucket checks a signature against its own address, so it still holds.
+@val external fetch: (string, Fetch.init) => promise<Fetch.response> = "fetch"
+let bucket = %re("/^http:\/\/127\.0\.0\.1:8081\//")
+let wire: Fetch.t = (href, init) => fetch(href->String.replaceRegExp(bucket, "/_radif/"), init)
+
 // One browser database a session, as the board keeps it.
 let open_ = async (token: string) => {
   let indexed = await outcome(reply => IndexedDbKv.make(~name=`radif:${token}`, reply))
-  let client = await Client.make({base: "/_radif", token, kv: indexed.kv})
+  let client = await Client.make({base: "/_radif", token, kv: indexed.kv, wire})
   let binding = RadifTilia.make(~client, ~clock=SystemClock.make())
   page.browse = Some(Browse.make(~actor=client.actor, ~binding))
   let held = Tilia.carve(({derived}) => {
@@ -604,7 +651,7 @@ module Editor = {
   let make = (~opened: opened) =>
     <main>
       <h1> {React.string(opened.document.titled.title)} </h1>
-      <TiliaEditor.View state=opened.state storage=opened.storage />
+      <TiliaEditor.View state=opened.state storage=opened.storage paste=opened.images.paste />
       <Status opened />
       {opened.standing.founder ? <Others opened /> : React.null}
     </main>
@@ -706,6 +753,9 @@ let style = `
   .editor code { font-family: "IBM Plex Mono", monospace; font-size: 0.85em; background: var(--faint); padding: 0.05em 0.3em; }
   .atom { display: inline-block; cursor: pointer; border-radius: 2px; }
   .display { text-align: center; }
+  .image { display: block; max-width: 100%; margin: 0 auto; }
+  .image__placeholder { display: block; width: 100%; min-height: 1.5em; background: var(--faint); }
+  .image__missing { color: var(--grey); font-size: 0.85rem; }
   .status { color: var(--grey); font-size: 0.85rem; border-top: 1px solid var(--faint); padding-top: 0.5rem; }
   .others { list-style: none; padding: 0; margin: 0.5rem 0; color: var(--grey); font-size: 0.85rem; }
   .others li { display: flex; align-items: center; gap: 0.75rem; margin: 0.25rem 0; }

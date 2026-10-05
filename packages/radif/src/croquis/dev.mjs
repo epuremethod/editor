@@ -44,5 +44,5 @@ const leaving = () => {
 process.on("SIGINT", leaving)
 process.on("SIGTERM", leaving)
 
-console.log(`\nBen:   http://ben.lapa:8080/?radif-session=${session}`)
-console.log(`Aisha: http://aisha.lapa:8080/?radif-code=${code}\n`)
+console.log(`\nBen:   http://ben.localhost:8080/?radif-session=${session}`)
+console.log(`Aisha: http://aisha.localhost:8080/?radif-code=${code}\n`)
