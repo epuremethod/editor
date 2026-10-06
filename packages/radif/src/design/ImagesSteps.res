@@ -4,18 +4,17 @@ open RadifDb.Data
 open RadifDb.Wire
 open Radif.Query
 
-// Steps for Images.feature. Ben's clients are real ones over a memory kv
-// and memory blobs, against the `radif dev` that `server.mjs` starts. Each
+// Steps for Images.feature. Ben's clients are real ones over a memory kv,
+// memory blobs and a memory cache, against the `radif dev` that `server.mjs` starts. Each
 // scenario makes its own course. "Another device" is a second client of
 // Ben's: what it writes reaches the first through a real pull. The first
-// client's wire wraps the platform's fetch, and can hold the reads of an
+// client's network wraps the platform's, and can hold the reads of an
 // object until its bytes arrive. "Draws" renders the image rule's renderer
 // to markup and reads it.
 
 type radif = {base: string, session: string}
 @module("vitest") external inject: string => radif = "inject"
 
-@val external fetch: Fetch.t = "fetch"
 @new
 external file: (array<Uint8Array.t>, string, {"type": string}) => TiliaEditor.Browser.file =
   "File"
@@ -29,6 +28,15 @@ let raise = message => JsError.throwWithMessage(message)
 let outcome = (run: Reply.outcome<'a> => unit): promise<'a> =>
   Promise.make((resolve, reject) =>
     run({ok: resolve, error: message => reject(JsError.make(message))})
+  )
+
+let found = (run: Reply.find<'a> => unit): promise<option<'a>> =>
+  Promise.make((resolve, reject) =>
+    run({
+      found: value => resolve(Some(value)),
+      missing: () => resolve(None),
+      error: message => reject(JsError.make(message)),
+    })
   )
 
 let settle = ms => Promise.make((resolve, _) => setTimeout(() => resolve(), ms)->ignore)
@@ -46,63 +54,136 @@ let until = async (check: unit => bool) => {
 
 let bytesOf = (name: string) => encoder()["encode"](`the bytes of ${name}`)
 
-// The wire of Ben's first client: it counts the pushes, and holds every
-// read of an object while `holding` is set.
-type wire = {
-  wire: Fetch.t,
+// The network of one of Ben's clients. It counts the pushes and the object
+// reads. A read carries the customer key in its headers, and a part goes up
+// to a presigned address that names its number. While `holding` is set, it holds every read of an object, and
+// `halving` makes a read report half its body received and hold the rest.
+// It can hold the parts sent, after reporting half of each, hold the
+// pushes, and refuse the first part, holding the parts after it.
+type network = {
+  network: Network.t,
   mutable holding: bool,
+  mutable halving: bool,
   mutable held: array<unit => unit>,
+  mutable sendingHalf: bool,
+  mutable holdingParts: bool,
+  mutable refusing: bool,
+  mutable holdingPushes: bool,
+  mutable parked: array<unit => unit>,
   mutable pushes: int,
   mutable landed: int,
+  mutable reads: int,
 }
 
-let wired = () => {
+let networked = () => {
   let rec self = {
-    wire: (href, init) => {
+    network: (href, init, reply) => {
       let object =
         init.headers
         ->Option.flatMap(headers =>
           headers->Dict.get("x-amz-server-side-encryption-customer-key")
         )
         ->Option.isSome
+      let part = init.method_ == Some("PUT") && href->String.includes("partNumber=")
+      let read = object && init.method_ != Some("PUT")
       let pushing = href->String.includes("/push")
       if pushing {
         self.pushes = self.pushes + 1
       }
+      if read {
+        self.reads = self.reads + 1
+      }
       let send = () =>
-        fetch(href, init)->Promise.thenResolve(answer => {
-          if pushing && answer.ok {
-            self.landed = self.landed + 1
-          }
-          answer
-        })
-      if object && init.method_ != Some("PUT") && self.holding {
-        Promise.make((resolve, _) =>
-          self.held->Array.push(() => send()->Promise.thenResolve(resolve)->ignore)
+        PlatformNetwork.network(
+          href,
+          init,
+          {
+            ...reply,
+            received: (done, total) =>
+              if !self.halving {
+                reply.received(done, total)
+              },
+            found: answer => {
+              if pushing && answer.ok {
+                self.landed = self.landed + 1
+              }
+              if read && self.halving {
+                let size = answer.body->TypedArray.length->Int.toFloat
+                reply.received(size /. 2.0, size)
+                self.held->Array.push(() => {
+                  reply.received(size, size)
+                  reply.found(answer)
+                })
+              } else {
+                reply.found(answer)
+              }
+            },
+          },
         )
+      if read && self.holding {
+        self.held->Array.push(send)
+      } else if part && self.refusing {
+        self.refusing = false
+        self.holdingParts = true
+        reply.found(Network.answer(403, "refused"))
+      } else if part && self.sendingHalf {
+        let size = Network.size(init.body)
+        reply.sent(size /. 2.0, size)
+        self.parked->Array.push(send)
+      } else if part && self.holdingParts {
+        self.parked->Array.push(send)
+      } else if pushing && self.holdingPushes {
+        self.parked->Array.push(send)
       } else {
         send()
       }
     },
     holding: false,
+    halving: false,
     held: [],
+    sendingHalf: false,
+    holdingParts: false,
+    refusing: false,
+    holdingPushes: false,
+    parked: [],
     pushes: 0,
     landed: 0,
+    reads: 0,
   }
   self
 }
 
-let opens = async (~wire=?) => {
+// What a device keeps across a reload: its kv, the files it keeps until
+// their push lands, and the files it cached.
+type memory = {kv: Kv.t, blobs: Blobs.t, cache: Blobs.t}
+
+let remembered = () => {
+  kv: MemoryKv.make().kv,
+  blobs: MemoryBlobs.make().blobs,
+  cache: MemoryBlobs.make().blobs,
+}
+
+let opens = async (~network=?, ~memory=remembered()) => {
   let {base, session} = inject("radif")
   let client = await Client.make({
     base,
     token: session,
-    kv: MemoryKv.make().kv,
-    blobs: MemoryBlobs.make().blobs,
-    ?wire,
+    kv: memory.kv,
+    blobs: memory.blobs,
+    cache: memory.cache,
+    ?network,
   })
   let binding = RadifTilia.make(~client, ~clock=SystemClock.make())
   (client, binding)
+}
+
+// Ben's device as the course sees it now. Opening the course again
+// replaces each part.
+type ben = {
+  mutable client: Client.t,
+  mutable binding: RadifTilia.t,
+  mutable images: Images.t,
+  mutable network: network,
 }
 
 let loaded = loadable =>
@@ -127,8 +208,9 @@ let image = (binding: RadifTilia.t, id) =>
   binding.load(RadifStore.Image.one->withDrafts->at(id))
 
 given1("Ben's course {string}", async (on, title: string) => {
-  let wire = wired()
-  let (client, binding) = await opens(~wire=wire.wire)
+  let network = networked()
+  let memory = remembered()
+  let (client, binding) = await opens(~network=network.network, ~memory)
   on.test.onTestFinished(_ => client.close())
   let personal = await personalOf(client, binding)
   let course = RadifStore.Document.make(
@@ -142,13 +224,15 @@ given1("Ben's course {string}", async (on, title: string) => {
 
   // The size each pasted file decodes to, by its name.
   let sizes: dict<(int, int)> = Dict.make()
-  let images = Images.make(~client, ~binding, ~document, ~measure=pasted =>
-    Promise.resolve(
-      sizes
-      ->Dict.get((Obj.magic(pasted): {"name": string})["name"])
-      ->Option.getOr((0, 0)),
+  let imagesOf = (client, binding) =>
+    Images.make(~client, ~binding, ~document, ~measure=pasted =>
+      Promise.resolve(
+        sizes
+        ->Dict.get((Obj.magic(pasted): {"name": string})["name"])
+        ->Option.getOr((0, 0)),
+      )
     )
-  )
+  let ben = {client, binding, images: imagesOf(client, binding), network}
 
   // The atom a scenario follows, its live atom, and what the paste answered.
   let atom: ref<option<TiliaEditor.Rule.atom>> = ref(None)
@@ -178,11 +262,11 @@ given1("Ben's course {string}", async (on, title: string) => {
       text: id,
       param: Dict.make(),
     })
+    let {loader} = ben.images
     let held = Tilia.tilia({
-      "value": Tilia.source(TiliaEditor.Image.Loading({record: id, meta: None, blob: None}), (
-        previous,
-        set,
-      ) => images.loader(followed, previous, set)),
+      "value": Tilia.source(TiliaEditor.Image.rule(~loader).first(followed), (previous, set) =>
+        loader(followed, previous, set)
+      ),
     })
     let _ = Tilia.observe(() => ignore(held["value"]))
     atom := Some(followed)
@@ -205,7 +289,7 @@ given1("Ben's course {string}", async (on, title: string) => {
     | Some([_, Some(src)]) => Some(src)
     | _ => None
     }
-  let pastedUrl = () => images.pasted->Dict.get(followed().text)
+  let pastedUrl = () => ben.images.pasted->Dict.get(followed().text)
   let idOf = name =>
     switch rows->Dict.get(name) {
     | Some(row) => row.entity.id
@@ -219,31 +303,31 @@ given1("Ben's course {string}", async (on, title: string) => {
     }
   }
   let imagesOfCourse = () =>
-    binding.load(Radif.under(RadifStore.Image.klass)(document))->loaded->Option.getOr([])
+    ben.binding.load(Radif.under(RadifStore.Image.klass)(document))->loaded->Option.getOr([])
   let pastedRow = () =>
     switch answered.contents {
-    | Some(Some({text})) => image(binding, text)->loaded
+    | Some(Some({text})) => image(ben.binding, text)->loaded
     | _ => None
     }
 
-  on.step("Ben is offline", () => client.offline())
+  on.step("Ben is offline", () => ben.client.offline())
 
   on.step(
     "Ben pastes the image {string} of {number} × {number} pixels",
     (name: string, width: int, height: int) => {
       sizes->Dict.set(name, (width, height))
-      pushedBefore := wire.pushes
-      let answer = images.paste(file([bytesOf(name)], name, {"type": "image/png"}))
+      pushedBefore := ben.network.pushes
+      let answer = ben.images.paste(file([bytesOf(name)], name, {"type": "image/png"}))
       answered := Some(answer)
       answer->Option.forEach(({text}) => follow(text))
     },
   )
   on.step("Ben pastes the file {string}", (name: string) => {
-    pushedBefore := wire.pushes
-    answered := Some(images.paste(file([bytesOf(name)], name, {"type": "text/plain"})))
+    pushedBefore := ben.network.pushes
+    answered := Some(ben.images.paste(file([bytesOf(name)], name, {"type": "text/plain"})))
   })
   on.step("the push lands", async () => {
-    await until(() => wire.landed > pushedBefore.contents && pastedRow()->Option.isSome)
+    await until(() => ben.network.landed > pushedBefore.contents && pastedRow()->Option.isSome)
     await until(() =>
       switch value() {
       | Ready(_) => true
@@ -255,7 +339,7 @@ given1("Ben's course {string}", async (on, title: string) => {
     await until(() =>
       switch answered.contents {
       | Some(Some({text})) =>
-        switch image(binding, text) {
+        switch image(ben.binding, text) {
         | Loaded(_) | NoData(_) => true
         | _ => false
         }
@@ -263,7 +347,34 @@ given1("Ben's course {string}", async (on, title: string) => {
       }
     )
   )
-  on.step("the image leaves the section", () => images.leave(followed()))
+  on.step("the image leaves the section", () => ben.images.leave(followed()))
+
+  on.step("half of its bytes are sent", async () => {
+    ben.network.sendingHalf = true
+    await until(() => ben.network.parked->Array.length > 0)
+  })
+  on.step("every byte is sent and the push is in flight", async () => {
+    ben.network.holdingPushes = true
+    await until(() => ben.network.parked->Array.length > 0)
+  })
+  on.step("the bucket refuses the first part", async () => {
+    ben.network.refusing = true
+    await until(() => ben.network.holdingParts)
+  })
+  on.step("Ben opens the course again", async () => {
+    let text = followed().text
+    ben.client.close()
+    let network = networked()
+    network.holdingParts = true
+    let (client, binding) = await opens(~network=network.network, ~memory)
+    on.test.onTestFinished(_ => client.close())
+    client.offline()
+    ben.client = client
+    ben.binding = binding
+    ben.images = imagesOf(client, binding)
+    ben.network = network
+    follow(text)
+  })
 
   on.step("an atom names the row {string} that no pull has brought", async (name: string) => {
     let (device, _) = await otherDevice()
@@ -279,7 +390,7 @@ given1("Ben's course {string}", async (on, title: string) => {
         ~titled={title: name},
       ),
     )
-    client.offline()
+    ben.client.offline()
     follow(idOf(name))
   })
   on.step("an atom names the row {string}", async (name: string) => {
@@ -296,7 +407,7 @@ given1("Ben's course {string}", async (on, title: string) => {
         ~titled={title: name},
       ),
     )
-    wire.holding = true
+    ben.network.holding = true
     follow(idOf(name))
   })
   on.step("the pull answers that {string} does not exist", async (name: string) => {
@@ -316,7 +427,9 @@ given1("Ben's course {string}", async (on, title: string) => {
     | Some(row) => row
     | None => raise(`no row is named ${name}`)
     }
-    let bytes = await device.bytes(~row=row.entity.id, blob([bytesOf(title)], {"type": "image/png"}))
+    let bytes = await outcome(reply =>
+      device.bytes(~row=row.entity.id, blob([bytesOf(title)], {"type": "image/png"}), reply)
+    )
     row.file = {bytes: bytes}
     row.titled = {title: title}
     row.sized = {width: Int.toFloat(width), height: Int.toFloat(height)}
@@ -325,13 +438,8 @@ given1("Ben's course {string}", async (on, title: string) => {
     }
     await outcome(reply => device.upsert([RadifStore.Image.record(row)], reply))
     await until(() => device.status() == Clear)
-    await client.online()
-    await until(() =>
-      switch value() {
-      | Loading({meta: Some(_)}) | Ready(_) => true
-      | _ => false
-      }
-    )
+    await ben.client.online()
+    await until(() => drawn()->String.includes("aspect-ratio") || source()->Option.isSome)
   }
   on.step(
     "a pull brings the image {string} titled {string} of {number} × {number} pixels",
@@ -343,10 +451,19 @@ given1("Ben's course {string}", async (on, title: string) => {
     async (name: string, title: string, width: int, height: int) =>
       await brings(~draft=true, name, title, width, height),
   )
+  on.step("half of its bytes arrive", async () => {
+    ben.network.holding = false
+    ben.network.halving = true
+    let held = ben.network.held
+    ben.network.held = []
+    held->Array.forEach(release => release())
+    await until(() => ben.network.held->Array.length > 0)
+  })
   on.step("its bytes arrive", async () => {
-    wire.holding = false
-    let held = wire.held
-    wire.held = []
+    ben.network.halving = false
+    ben.network.holding = false
+    let held = ben.network.held
+    ben.network.held = []
     held->Array.forEach(release => release())
     await until(() =>
       switch value() {
@@ -392,14 +509,18 @@ given1("Ben's course {string}", async (on, title: string) => {
     await until(() => pastedRow()->Option.isSome)
     switch pastedRow() {
     | Some(row) =>
-      let read = await client.open_(row.file.bytes)
-      expect(read->Option.map(read => read.bytes)).toEqual(Some(bytesOf("cover.png")))
+      let read = await found(reply => ben.client.blob(row.file.bytes, reply))
+      let bytes = switch read {
+      | Some(read) => Some(Blobs.ofBuffer(await read->Blobs.buffer))
+      | None => None
+      }
+      expect(bytes).toEqual(Some(bytesOf("cover.png")))
     | None => raise("the course holds no pasted image")
     }
   })
   on.step("nothing was pushed", async () => {
     await settle(100)
-    expect(wire.pushes).toBe(pushedBefore.contents)
+    expect(ben.network.pushes).toBe(pushedBefore.contents)
   })
   on.step("the paste answers nothing", () =>
     expect(answered.contents).toEqual(Some(None))
@@ -426,7 +547,7 @@ given1("Ben's course {string}", async (on, title: string) => {
     ).toBe(true)
   )
   on.step("the pasted file is released", () =>
-    expect(images.pasted->Dict.get(followed().text)).toEqual(None)
+    expect(ben.images.pasted->Dict.get(followed().text)).toEqual(None)
   )
   on.step("the image {string} draws a placeholder", (name: string) => {
     named(name)
@@ -448,6 +569,37 @@ given1("Ben's course {string}", async (on, title: string) => {
       expect(source()).toEqual(None)
     },
   )
+  let shows = async (part, text) => {
+    await until(() => drawn()->String.includes(part) && drawn()->String.includes(text))
+    expect(drawn()->String.includes(part)).toBe(true)
+    expect(drawn()->String.includes(text)).toBe(true)
+  }
+  on.step("the image shows its upload waiting for the network", async () =>
+    await shows("image__upload", "Waiting for the network")
+  )
+  on.step("the image shows its upload at {number}%", async (share: int) =>
+    await shows("image__upload", `Uploading ${Int.toString(share)}%`)
+  )
+  on.step("the image shows its upload saving", async () => await shows("image__upload", "Saving"))
+  on.step("the image shows its upload trying again", async () =>
+    await shows("image__upload", "Trying again")
+  )
+  on.step("the image shows no upload", () =>
+    expect(drawn()->String.includes("image__upload")).toBe(false)
+  )
+  on.step("the image {string} shows no upload", (name: string) => {
+    named(name)
+    expect(drawn()->String.includes("image__upload")).toBe(false)
+  })
+  on.step("the image {string} shows its download at {number}%", async (name: string, share: int) => {
+    named(name)
+    await shows("image__download", `${Int.toString(share)}%`)
+  })
+  on.step("the image draws the kept file", async () => {
+    await until(() => source()->Option.isSome)
+    expect(source()->Option.map(src => src->String.startsWith("blob:"))).toEqual(Some(true))
+    expect(ben.network.reads).toBe(0)
+  })
   on.step("the image {string} draws the stored bytes", (name: string) => {
     named(name)
     let src = source()

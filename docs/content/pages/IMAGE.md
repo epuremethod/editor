@@ -129,9 +129,10 @@ the block list, so the atom stays typed and is not saved at once. The
 loader must read the text on screen, and not the saved row, or that image
 would not load until the save.
 
-The blob settles like typed text. It lies over the bytes while the upload
-runs. Once the storage holds the bytes and the device has them, the blob
-has nothing left to add, and `storage/binding` drops it.
+The blob lies over the bytes while the upload runs, like typed text over
+the row. Unlike typed text, it stays once the storage holds the bytes: it
+is the same image, and a new source would blink. `storage/binding`
+releases it when the image leaves the section.
 
 ## One rule per type
 
@@ -231,18 +232,33 @@ editor does not see the change. The image model is `Image.t` in
 
 ```
 image:
-  Loading({record, meta?, blob?})   the row or its bytes are on their way
-  Missing(record)                   no such row, or the reader cannot reach it
-  Ready({meta, src})                the bytes are on the device
+  Loading(record)                           the row is on its way
+  Uploading({record, meta?, src, progress?})  this device holds the file and stores it
+  Downloading({meta, progress?})            the bytes are on their way down
+  Missing(record)                           no such row, or the reader cannot reach it
+  Ready({meta, src})                        the bytes are stored and on the device
 meta: {record, object, width, height, title, description}
+progress: {done, total, state}
+upload: Waiting | Offline | Sending | Saving | Retrying(reason) | Stopped(reason)
+download: Offline | Receiving | Checking
 ```
 
-- While it loads, an image draws the blob when the device holds it, a
-  placeholder of its width and height when the row has arrived, and a
-  placeholder of one line otherwise.
+- `Loading` draws a placeholder of one line.
+- `Uploading` draws the file, with the upload over its bottom right
+  corner: "Uploading 50%" with a bar while it sends, or what it waits
+  for: "Waiting for the network", "Saving", "Trying again", or why it
+  stopped.
+- `Downloading` draws a placeholder of the image's width and height. While
+  the bytes come down, a ring in its center shows how far they are.
 - `Missing` says that the image is not available.
-- `Ready` draws the image, with the description as its text for a reader
-  who cannot see it.
+- `Ready` draws the image alone, with the description as its text for a
+  reader who cannot see it.
+
+An image that only came down shows no overlay once it is ready.
+
+`@tilia/editor` ships no styles. A host draws an image's display atom as a
+block, `.atom--display { display: block; }`. An atom otherwise shrinks to
+its content, and a placeholder wider than the column would overflow it.
 
 A row that does not answer may still be on its way: a client cannot tell
 a row it has not pulled from a row that does not exist. So the radif
@@ -285,13 +301,21 @@ app | draws the blob from the first draw
 
 ### The upload
 
-The editor does not see the upload. The pasted blob is the image's `src`
-from the first draw, so the image shows before any byte has left the
-device. It stays the `src` once the bytes are stored: radif keeps every
-object under a customer key, so a read sends the key in its headers, and
-an image read back would be an in-memory blob of the same bytes. Radif
-drops its own kept copy when the push that names it lands. The binding
-releases the pasted blob when the image leaves the section.
+The editor does not see the upload: the loader does. The pasted blob is
+the image's `src` from the first draw, so the image shows before any byte
+has left the device. It stays the `src` once the bytes are stored, so the
+image never blinks. The binding releases the pasted blob when the image
+leaves the section.
+
+The loader follows the bytes with `client.transfers`. Radif says each
+state on its way, `Upload(_)` or `Download(_)`, and the loader turns it
+into `Uploading` or `Downloading` with its progress. The upload's last
+state, `Done`, sets `Ready`. A file kept before a reload still uploads
+after it, and `client.blob` answers it from the device, so the image
+shows its file and its upload again.
+
+Radif caches the files a client read, and the files it uploaded once
+their push landed. A cached image answers at once, with no download.
 
 A refused save starts the upload again. With radif, the client mints a new
 object key, rewrites the record, and uploads again under that key. An
@@ -333,11 +357,12 @@ Radif already gives the binding what it stands on:
   `Sized` and `Attached`;
 - a list of atoms whose entries carry a param, read as `Radif.placed`;
 - `client.bytes`, which keeps a pasted blob until the push that names it
-  lands, and `client.open_`, which reads the kept blob or the stored bytes;
+  lands, and `client.blob`, which answers the kept blob, the cached one,
+  or the stored bytes;
+- `client.transfers`, which says how far an upload or a download has gone,
+  and what it waits for;
 - a draft, which holds the bytes before the description is written.
 
-Radif does not report how far an upload or a download has gone yet. A
-progress bar waits for it.
 
 ## Not yet
 

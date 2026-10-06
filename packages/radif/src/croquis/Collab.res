@@ -479,16 +479,24 @@ type held = {
 
 // The page is the one exposed port. `radif dev` names its bucket by its own
 // address, which the browser cannot reach from another origin, so an
-// object's address goes through the page's proxy, as the wire does. The
-// bucket checks a signature against its own address, so it still holds.
-@val external fetch: (string, Fetch.init) => promise<Fetch.response> = "fetch"
+// object's address goes through the page's proxy, as the client's requests
+// do. The bucket checks a signature against its own address, so it still
+// holds.
 let bucket = %re("/^http:\/\/127\.0\.0\.1:8081\//")
-let wire: Fetch.t = (href, init) => fetch(href->String.replaceRegExp(bucket, "/_radif/"), init)
+let network: Network.t = (href, init, reply) =>
+  PlatformNetwork.network(href->String.replaceRegExp(bucket, "/_radif/"), init, reply)
 
 // One browser database a session, as the board keeps it.
 let open_ = async (token: string) => {
   let indexed = await outcome(reply => IndexedDbKv.make(~name=`radif:${token}`, reply))
-  let client = await Client.make({base: "/_radif", token, kv: indexed.kv, wire})
+  let client = await Client.make({
+    base: "/_radif",
+    token,
+    kv: indexed.kv,
+    blobs: indexed.blobs,
+    cache: indexed.cache,
+    network,
+  })
   let binding = RadifTilia.make(~client, ~clock=SystemClock.make())
   page.browse = Some(Browse.make(~actor=client.actor, ~binding))
   let held = Tilia.carve(({derived}) => {
@@ -753,8 +761,20 @@ let style = `
   .editor code { font-family: "IBM Plex Mono", monospace; font-size: 0.85em; background: var(--faint); padding: 0.05em 0.3em; }
   .atom { display: inline-block; cursor: pointer; border-radius: 2px; }
   .display { text-align: center; }
+  .atom--display { display: block; }
   .image { display: block; max-width: 100%; margin: 0 auto; }
-  .image__placeholder { display: block; width: 100%; min-height: 1.5em; background: var(--faint); }
+  .image__placeholder { display: grid; place-items: center; width: 100%; min-height: 1.5em; margin: 0 auto; background: var(--faint); }
+  .image__frame { position: relative; display: block; width: fit-content; max-width: 100%; margin: 0 auto; }
+  .image__upload { position: absolute; right: 0.5rem; bottom: 0.5rem; display: flex; flex-direction: column; gap: 0.2rem; padding: 0.2rem 0.5rem; border-radius: 2px; background: rgb(255 255 255 / 0.9); color: var(--black); font-size: 0.75rem; }
+  .image__bar { display: block; width: 6rem; height: 3px; background: var(--faint); }
+  .image__sent { display: block; height: 100%; background: var(--red); }
+  .image__download { display: grid; place-items: center; width: 3rem; height: 3rem; }
+  .image__download > * { grid-area: 1 / 1; }
+  .image__ring { width: 100%; height: 100%; transform: rotate(-90deg); }
+  .image__track, .image__received { fill: none; stroke-width: 2.5; }
+  .image__track { stroke: #fff; }
+  .image__received { stroke: var(--black); }
+  .image__share { color: var(--black); font-size: 0.7rem; }
   .image__missing { color: var(--grey); font-size: 0.85rem; }
   .status { color: var(--grey); font-size: 0.85rem; border-top: 1px solid var(--faint); padding-top: 0.5rem; }
   .others { list-style: none; padding: 0; margin: 0.5rem 0; color: var(--grey); font-size: 0.85rem; }

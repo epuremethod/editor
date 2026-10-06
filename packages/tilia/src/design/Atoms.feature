@@ -20,11 +20,11 @@ Feature: Live atoms
   ready. A new param is not read by the loader, so it runs no loader.
 
   The `math` rule's live atom is the atom object itself. The `image` rule's
-  live atom is the image model: Loading, Missing or Ready. The image loader
-  in these scenarios reads the records of the scenario. A record with its
-  bytes on the device is Ready. A record without them is Loading, with its
-  size. A record still on its way leaves the previous value.
-  An id with no record is Missing.
+  live atom is the image model: Loading, Uploading, Downloading, Missing or
+  Ready. The image loader in these scenarios reads the records of the
+  scenario. A record with its bytes on the device is Ready. A record
+  without them is Downloading, with its size. A record still on its way
+  leaves the previous value. An id with no record is Missing.
 
   # ── Rules ──────────────────────────────────────────────────────────────
 
@@ -118,7 +118,7 @@ Feature: Live atoms
       | atom | live                    |
       | f2   | Ready(r42, 800 × 400)   |
 
-  Scenario: An image whose bytes are not on the device is loading with its size
+  Scenario: An image whose bytes are not on the device is downloading with its size
     Given a section
       | block | text                                |
       | a     | An open cover of the unit interval:║ |
@@ -131,7 +131,7 @@ Feature: Live atoms
       | r42    | cover.png | Three open intervals cover [0, 1]. | 800   | 400    | remote |
     Then the live atoms are
       | atom | live                        |
-      | f2   | Loading(r42, 800 × 400)     |
+      | f2   | Downloading(r42, 800 × 400) |
 
   Scenario: The live atom follows the record when its bytes arrive
     Given a section

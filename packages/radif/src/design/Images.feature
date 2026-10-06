@@ -18,6 +18,14 @@ Feature: Images
   its file on screen after the upload, since the bytes are the same, and
   releases the file when it leaves the section.
 
+  While this device uploads the bytes, the image shows the upload over the
+  file: how far it has gone, and what it waits for. The overlay goes once
+  the bucket holds the bytes and the push that names them lands. A file
+  pasted before a reload still uploads after it, so the image shows its
+  upload again. An image that only came down from the bucket shows no
+  overlay. While its bytes come down, its placeholder shows how far the
+  download has gone.
+
   The world is Ben's course, "Open sets", over a real client and a wire
   that each scenario answers. A row "from another device" is one that a
   pull brings.
@@ -75,6 +83,41 @@ Feature: Images
     Then the image draws the pasted file
     And the image is ready
 
+  # ── Uploading ──────────────────────────────────────────────────────────
+
+  Scenario: An image pasted offline shows its upload waiting for the network
+    Given Ben is offline
+    When Ben pastes the image "cover.png" of 800 × 400 pixels
+    Then the image shows its upload waiting for the network
+
+  Scenario: A pasted image shows how far its upload has gone
+    When Ben pastes the image "cover.png" of 800 × 400 pixels
+    And half of its bytes are sent
+    Then the image draws the pasted file
+    And the image shows its upload at 50%
+
+  Scenario: A pasted image shows its upload saving once every byte is sent
+    When Ben pastes the image "cover.png" of 800 × 400 pixels
+    And every byte is sent and the push is in flight
+    Then the image shows its upload saving
+
+  Scenario: A pasted image shows its upload trying again after a refused part
+    When Ben pastes the image "cover.png" of 800 × 400 pixels
+    And the bucket refuses the first part
+    Then the image shows its upload trying again
+
+  Scenario: A pasted image shows no upload once its push lands
+    When Ben pastes the image "cover.png" of 800 × 400 pixels
+    And the push lands
+    Then the image shows no upload
+
+  Scenario: An image pasted before a reload shows its upload after it
+    Given Ben is offline
+    When Ben pastes the image "cover.png" of 800 × 400 pixels
+    And Ben opens the course again
+    Then the image draws the kept file
+    And the image shows its upload waiting for the network
+
   Scenario: A pasted image that leaves the section releases its file
     When Ben pastes the image "cover.png" of 800 × 400 pixels
     And the image leaves the section
@@ -94,11 +137,19 @@ Feature: Images
     And a pull brings the image "r42" titled "finite.png" of 600 × 300 pixels
     Then the image "r42" draws a placeholder of 600 × 300
 
+  Scenario: An image from another device shows how far its download has gone
+    When an atom names the row "r42"
+    And a pull brings the image "r42" titled "finite.png" of 600 × 300 pixels
+    And half of its bytes arrive
+    Then the image "r42" draws a placeholder of 600 × 300
+    And the image "r42" shows its download at 50%
+
   Scenario: An image from another device shows once its bytes arrive
     When an atom names the row "r42"
     And a pull brings the image "r42" titled "finite.png" of 600 × 300 pixels
     And its bytes arrive
     Then the image "r42" draws the stored bytes
+    And the image "r42" shows no upload
 
   Scenario: An image draft from another device shows like a stored image
     When an atom names the row "r42"

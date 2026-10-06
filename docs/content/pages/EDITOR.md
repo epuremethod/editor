@@ -220,6 +220,12 @@ section | the changed blocks written back as markdown
 update | the host receives the section, whole
 ```
 
+A row that lands goes through the host's `merge`, with the base, the row
+and the displayed section. A host's merge must keep a local atom that
+neither the base nor the remote holds. A paste into an empty paragraph
+keeps the block list, so its atom stays unsaved until the host saves, and
+a row that lands in that time would otherwise drop it.
+
 Embeds are opaque to the editor. An embed block is a fenced dictionary with
 a type and parameters, rendered through a component the host injects for
 that type. The editor never asks what the id means. The radif binding
@@ -428,6 +434,12 @@ own block. The previous answer was to split into blocks past ten items.
 The evaluator trigger on a relation change, sibling of the trigger on an
 `under` edge, is a cost to schedule on the radif side.
 
+Four radif gaps the croquis works around in `Collab.res`: the back-query
+along `attached.parents`, the bucket of `radif dev` without CORS, a read
+by id that answers "no match" offline, and a Node client that is not told
+to pull. The image loader waits for the client to be in step and quiet
+for 500 milliseconds before it says an image is missing.
+
 ## Where it stands
 
 `@epure/editor` exists and is the model described here: the types, runs,
@@ -461,11 +473,16 @@ the cards run in Chrome through the same fixtures; seventeen are skipped
 because no key drives them. Composition is wired
 and untested, and Safari and Firefox are untouched.
 
-`@radif/editor` holds only a croquis. The founder makes a Document with
-one Section and offers it at `edit`. A member accepts and reaches the
-Section through `@radif/tilia`. In Chrome the founder's first push is
-refused today: radif's client can push the edges before the rows. Nothing
-on the rows and reach pages is built.
+`@radif/editor` binds images to radif, and holds a croquis. A pasted
+image is a draft row of `Image` under the document, and its loader follows
+radif's transfers: an upload draws over the file, a download draws a ring
+in a placeholder of the image's size. A file pasted before a reload
+uploads after it, and a stored or read image comes from radif's cache.
+Twenty-two scenarios pass against a real `radif dev`. In the croquis, the
+founder makes a Document with one Section and offers it at `edit`. A
+member accepts and reaches the Section through `@radif/tilia`, and an
+image one of them pastes reaches the other in Chrome. Nothing on the rows
+and reach pages is built.
 `@radif/db` merges a record field by field; diff3 on a text field and the
 keyed array's sequence merge are still to write there.
 
@@ -478,7 +495,7 @@ keyed array's sequence merge are still to write there.
 | Copy and paste | paste from plain text; copy and HTML to come |
 | Undo | not started |
 | Block forms: headings and items | done |
-| Formulas and embeds | formulas done; the param, `embed` and `place` done; rules and live atoms done; image rows not bound |
+| Formulas and embeds | formulas done; the param, `embed` and `place` done; rules and live atoms done; images bound to radif, with upload and download progress |
 | Typed text and a landed row | done in the core and the view |
 | Radif: text diff3, the sequence merge, rows through the port | not started |
 

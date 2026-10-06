@@ -247,3 +247,41 @@ box. The core's `type_` keeps its name for now.
 
 Refused: `spec` with `render`, `enter` and `widget`. Three ways to say what
 a click does, and no place for a loader or a param.
+
+## 2026-10-06 — A pasted image keeps its file as its source
+
+The object URL of a pasted file is the image's `src` from the paste until
+the image leaves the section. The upload landing does not change it.
+
+Refused: swapping to the stored bytes at `Ready`. Radif reads an object
+with the customer key in its headers, so a stored image is an in-memory
+blob of the same bytes. The swap would change the source, and the image
+would blink.
+
+Costs one object URL per pasted image, held while it stays in the section.
+
+## 2026-10-06 — The image loader follows radif's transfers
+
+The loader follows `client.transfers` for the bytes its row names, and
+sets the image from each message. Radif says the way on each message,
+`Upload(_)` or `Download(_)`, so an upload maps to `Uploading` and a
+download to `Downloading`. A blob that radif answers before its first
+message draws nothing yet, since it may come from the cache.
+
+Refused: guessing the way in the binding from the first message. Radif
+said `Offline` for both ways, so radif now splits its states. Refused: the
+follow in the rule. `@tilia/editor` would learn about transfers, and the
+demo has none.
+
+Costs a follow per atom, cancelled on each run of the loader and when the
+atom leaves.
+
+## 2026-10-06 — An upload draws over the file, a download in the placeholder
+
+An image this device uploads draws its file, with a line at its bottom
+right saying how far the upload has gone or what it waits for. An image
+on its way down draws a placeholder of its size, with a ring at its
+center. A stored image draws nothing over it.
+
+Refused: one overlay for both ways. A downloaded image would carry a mark
+it does not need once ready, and the placeholder already holds the space.

@@ -84,8 +84,10 @@ let sized = (meta: Image.meta) =>
 
 let shown = (image: Image.t) =>
   switch image {
-  | Loading({meta: Some(meta)}) => `Loading(${sized(meta)})`
-  | Loading({record}) => `Loading(${record})`
+  | Loading(record) => `Loading(${record})`
+  | Uploading({meta: Some(meta)}) => `Uploading(${sized(meta)})`
+  | Uploading({record}) => `Uploading(${record})`
+  | Downloading({meta}) => `Downloading(${sized(meta)})`
   | Missing(id) => `Missing(${id})`
   | Ready({meta}) => `Ready(${sized(meta)})`
   }
@@ -122,7 +124,7 @@ given1("a section", (on, table: array<array<string>>) => {
       }
       switch found.bytes {
       | "device" => set(Ready({meta, src: "blob:" ++ text}))
-      | "remote" => set(Loading({record: text, meta: Some(meta), blob: None}))
+      | "remote" => set(Downloading({meta, progress: None}))
       | _ => ()
       }
     }
